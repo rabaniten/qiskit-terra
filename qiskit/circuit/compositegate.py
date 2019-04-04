@@ -19,7 +19,7 @@ class CompositeGate(Gate):  # pylint: disable=abstract-method
         """Create a new composite gate.
 
         name = instruction name string
-        params = list of real parameters
+        params =parameters specifying the gate
         qarg = list of pairs (QuantumRegister, index)
         circ = QuantumCircuit or CompositeGate containing this gate
         """
@@ -67,14 +67,14 @@ class CompositeGate(Gate):  # pylint: disable=abstract-method
             raise QiskitError("qubit '%s[%d]' not argument of gate"
                               % (qubit[0].name, qubit[1]))
 
-    def _check_dups(self, qubits):
+    def _check_dups(self, qubits: object, message: object = "duplicate qubit arguments") -> object:
         """Raise exception.
 
         if list of qubits contains duplicates.
         """
         squbits = set(qubits)
         if len(squbits) != len(qubits):
-            raise QiskitError("duplicate qubit arguments")
+            raise QiskitError(message)
 
     def qasm(self):
         """Return OPENQASM string."""
