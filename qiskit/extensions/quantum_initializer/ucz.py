@@ -30,9 +30,11 @@ class UCZ(UCRot):  # pylint: disable=abstract-method
     """Uniformly controlled R_z rotations (also called multiplexed rotations). The decomposition is based on
     "Synthesis of Quantum Logic Circuits" by V. Shende et al. (https://arxiv.org/pdf/quant-ph/0406176.pdf)
     angle_list = list (real) rotation angles [a_0,...,a_{2^k-1}]
-    q_controls = list of control k qubits (at least of length one). The qubits are ordered according to their significance in the computational basis.
-                    For example if q_controls=[q[2],q[1]] (with q = QuantumRegister(2)), the rotation R_z(a_0)is performed if q[2] and q[1] are in the state zero,
-                    R_z(a_1) is performed if q[2] is in the state zero and q[1] is in the state one, and so on.
+    q_controls =  list of control k qubits (at least of length one). The qubits are ordered according to their
+                    significance in in increasing order.
+                    For example if q_controls=[q[2],q[1]] (with q = QuantumRegister(2)), the rotation R_z(a_0)is
+                    performed if q[2] and q[1] are in the state zero,
+                    R_z(a_1) is performed if q[2] is in the state one and q[1] is in the state zero, and so on.
     q_target = target qubit, where we act on with the single-qubit gates.
     circ = QuantumCircuit or CompositeGate containing this gate
     """

@@ -35,9 +35,11 @@ class UCRot(CompositeGate):  # pylint: disable=abstract-method
     """Uniformly controlled rotations (also called multiplexed rotations). The decomposition is based on
     "Synthesis of Quantum Logic Circuits" by V. Shende et al. (https://arxiv.org/pdf/quant-ph/0406176.pdf)
     angle_list = list (real) rotation angles [a_0,...,a_{2^k-1}]
-    q_controls = list of control k qubits (at least of length one). The qubits are ordered according to their significance in the computational basis.
-                    For example if q_controls=[q[2],q[1]] (with q = QuantumRegister(2)), the rotation R_t(a_0)is performed if q[2] and q[1] are in the state zero,
-                    R_t(a_1) is performed if q[2] is in the state zero and q[1] is in the state one, and so on.
+    q_controls = list of control k qubits (or empty list if no controls). The qubits are ordered according to their
+                    significance in in increasing order.
+                    For example if q_controls=[q[2],q[1]] (with q = QuantumRegister(2)), the rotation R_t(a_0)is
+                    performed if q[2] and q[1] are in the state zero,
+                    R_t(a_1) is performed if q[2] is in the state one and q[1] is in the state zero, and so on.
     q_target = target qubit, where we act on with the single-qubit gates.
     circ = QuantumCircuit or CompositeGate containing this gate
     """
@@ -54,11 +56,11 @@ class UCRot(CompositeGate):  # pylint: disable=abstract-method
         # Check if the entries in q_controls are qubits
         for qu in q_controls:
             if not (type(qu) == tuple and type(qu[0]) == QuantumRegister):
-                raise QiskitError("There is a control qubit which is not of the type used for qubits.")
+                raise QiskitError("Wrong type: there is a control qubit which is not part of a QuantumRegister.")
         # Check if angle_list has type "list"
         if not type(angle_list) == list:
             raise QiskitError(
-                "The single-qubit unitaries are not provided in a list.")
+                "The angles are not provided in a list.")
         # Check if the angles in angle_list are real numbers
         for a in angle_list:
             try:
@@ -69,12 +71,11 @@ class UCRot(CompositeGate):  # pylint: disable=abstract-method
         if not (type(q_target) == tuple and type(q_target[0]) == QuantumRegister):
             raise QiskitError("The target qubit is not a single qubit from a QuantumRegister.")
 
-        """Check if the input has the correct form"""
-        # Check if number of gates in angle_list is a positive power of two
+        """Check input form"""
         num_contr = math.log2(len(angle_list))
-        if num_contr <= 0 or not num_contr.is_integer():
-            raise QiskitError("The number of controlled rotation gates is not a positive power of 2.")
-        # Check if number of control qubits does correspond to the number of rotation angles
+        if num_contr < 0 or not num_contr.is_integer():
+            raise QiskitError("The number of controlled rotation gates is not a non-negative power of 2.")
+        # Check if number of control qubits does correspond to the number of rotations
         if num_contr != len(q_controls):
             raise QiskitError("Number of controlled rotations does not correspond to the number of control-qubits.")
 
@@ -90,25 +91,28 @@ class UCRot(CompositeGate):  # pylint: disable=abstract-method
         """
         Call to populate the self.data list with gates that implement the uniformly controlled gate
         """
-        # First, we find the rotation angles of the single-qubit rotations acting on the target qubit
-        angles = self.params.copy()
-        self._dec_uc_rotations(angles, 0, len(angles), False)
-        # Now, it is easy to place the C-NOT gates to get out the full decomposition.
-        for i in range(len(angles)):
-            if self.rot_axes == "Z":
-                self._attach(RZGate(angles[i], self.q_target))
-            if self.rot_axes == "Y":
-                self._attach(RYGate(angles[i], self.q_target))
-            # The number of the control qubit (labeling the control qubits from the bottom to the top,
-            # starting with zero) is given by the number of zeros at the end of the binary representation of (i+1)
-            if not i == len(angles)-1:
-                binary_rep = np.binary_repr(i + 1)
-                num_trailing_zeros = len(binary_rep) - len(binary_rep.rstrip('0'))
-                q_contr_index = num_trailing_zeros
-            else:
-                # Handle special case:
-                q_contr_index = len(self.q_controls)-1
-            self._attach(CnotGate(self.q_controls[q_contr_index], self.q_target))
+        if len(self.q_controls) == 0:
+            self._attach(RZGate(self.params[0], self.q_target))
+        else:
+            # First, we find the rotation angles of the single-qubit rotations acting on the target qubit
+            angles = self.params.copy()
+            self._dec_uc_rotations(angles, 0, len(angles), False)
+            # Now, it is easy to place the C-NOT gates to get out the full decomposition.
+            for i in range(len(angles)):
+                if self.rot_axes == "Z":
+                    self._attach(RZGate(angles[i], self.q_target))
+                if self.rot_axes == "Y":
+                    self._attach(RYGate(angles[i], self.q_target))
+                # The number of the control qubit (labeling the control qubits from the bottom to the top,
+                # starting with zero) is given by the number of zeros at the end of the binary representation of (i+1)
+                if not i == len(angles) - 1:
+                    binary_rep = np.binary_repr(i + 1)
+                    num_trailing_zeros = len(binary_rep) - len(binary_rep.rstrip('0'))
+                    q_contr_index = num_trailing_zeros
+                else:
+                    # Handle special case:
+                    q_contr_index = len(self.q_controls) - 1
+                self._attach(CnotGate(self.q_controls[q_contr_index], self.q_target))
 
     # Calculates rotation angles for a uniformly controlled R_t gate with a C-NOT gate at the end of the circuit.
     # If reversed == True, it decomposes the gate such that there is a C-NOT gate at the start (in fact, the circuit
