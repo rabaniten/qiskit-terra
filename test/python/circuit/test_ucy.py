@@ -72,12 +72,8 @@ class TestUCY(QiskitTestCase):
             dist = np.linalg.norm(np.array(vec_desired - vec_out))
             self.assertAlmostEqual(dist, 0)
 
-
-if __name__ == '__main__':
-    unittest.main()
-
-
 def apply_ucy_to_basis_state(angles, basis_state):
+    # ToDo: improve efficiency here by implementing a simulation for UCGs
     num_qubits = int(np.log2(len(angles))+1)
     angle = angles[basis_state//2]
     ry = np.array([[np.cos(angle/2), - np.sin(angle/2)], [np.sin(angle/2), np.cos(angle/2)]])
@@ -100,3 +96,6 @@ def get_binary_rep_as_list(n, num_digits):
         for c in line:
             binary.append(int(c))
     return binary
+
+if __name__ == '__main__':
+    unittest.main()
