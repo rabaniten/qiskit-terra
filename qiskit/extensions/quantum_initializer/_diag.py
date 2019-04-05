@@ -22,9 +22,12 @@ from qiskit.exceptions import QiskitError
 from qiskit.extensions.quantum_initializer._isometry import is_isometry
 from qiskit.extensions.quantum_initializer.zyz_dec import SingleQubitUnitary
 from qiskit.extensions.standard.cx import CnotGate
+from qiskit.extensions.quantum_initializer.ucz import UCZ
 
 _EPS = 1e-10  # global variable used to chop very small numbers to zero
 
+#ToDo: We could also input the diagonal gate by only providing the phases of the entries. This would be more efficient,
+#ToDo: however, maybe a bit less user friendly.
 
 class DiagGate(CompositeGate):  # pylint: disable=abstract-method
     """
@@ -67,22 +70,34 @@ class DiagGate(CompositeGate):  # pylint: disable=abstract-method
         super().__init__("init", diag, q, circ)
 
 
-    def dec_diag(self, up_to_diagonal=True):
+    def dec_diag(self):
         """
-        Call to populate the self.data list with gates that implement the uniformly controlled gate
+        Call to populate the self.data list with gates that implement the diagonal gate
         """
-        # First, we find the single qubit gates of the decomposition.
-        (single_qubit_gates, diag) = self._dec_ucg_help
-        # Now, it is easy to place the C-NOT gates and some Hadamards to get out the full decomposition.
-        for gate in single_qubit_gates:
-            self._attach(SingleQubitUnitary(gate, self.q_target))
-            # The number of the control qubit is given by the number of zeros at the end of the binary representation
-            # of (i+1)
-            binary_rep = np.binary_repr(i+1)
-            num_q_contr = len(binary_rep) - len(binary_rep .rstrip('0'))
-            self._attach(CnotGate(num_q_contr,q_target))
-        if not up_to_diagonal:
-            self._attach(DiagonalGate(diag, qubits))
+        n = len(self.params)
+        # Since the diagonal is a unitary, all its entries have absolute value one and the diagonal is fully specified
+        #  by its phases
+        diag_phases = [m.phase(z) for z in self.params]
+        while n >= 2:
+            angles_rz = []
+            for i in range(0, N, 2):
+                diag_phases[i // 2], rz_angle = _extract_rz(diag_phases[i], diag_phases[i + 1])
+                angles_rz.append(rz_angle)
+            self._attach(UCZ(single_qubit_gates[i], self.q_target))
+            _decompose_rotations(rotations, self.qargs)
+            decomposition.append(rotations)
+            n //= 2
+
+        decomposition.append([angles[0]])
+        return decomposition
+
+
+# extract a Rz rotation (angle given by first output) such that exp(j*phase)*Rz(z_angle) is equal to the diagonal matrix
+# with entriew exp(1j*ph1) and exp(1j*ph2)
+def _extract_rz(phi1, phi2):
+    phase = (phi1 + phi2) / 2.0
+    z_angle = phi2 - phi1
+    return phase, z_angle
 
 
     def _dec_ucg_help(self):
