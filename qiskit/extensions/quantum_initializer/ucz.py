@@ -48,6 +48,5 @@ class UCZ(UCRot):  # pylint: disable=abstract-method
 def ucz(self, angle_list, q_controls, q_target):
     return self._attach(UCZ(angle_list, q_controls, q_target, self))
 
-
 QuantumCircuit.ucz = ucz
 CompositeGate.ucz = ucz

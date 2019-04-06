@@ -34,8 +34,8 @@ class SingleQubitUnitary(CompositeGate):  # pylint: disable=abstract-method
 
     def __init__(self, u, q, circ=None):
         # Check if the matrix u has the right dimensions and if it is a unitary
-        if not type(u) == np.ndarray:
-            raise QiskitError("The input matrix u is not of type numpy.ndarray.")
+        # if not type(u) == np.ndarray:
+        #     raise QiskitError("The input matrix u is not of type numpy.ndarray.")
         if not u.shape == (2, 2):
             raise QiskitError("The dimension of the input matrix is not equal to (2,2).")
         if not is_isometry(u, _EPS):
@@ -57,9 +57,12 @@ class SingleQubitUnitary(CompositeGate):  # pylint: disable=abstract-method
         # First, we find the rotation angles (where we can ignore the global phase)
         (a, b, c, _) = self._zyz_dec()
         # Add the gates to the composite gate
-        self._attach(RZGate(a, self.qargs[0]))
-        self._attach(RYGate(b,  self.qargs[0]))
-        self._attach(RZGate(c,  self.qargs[0]))
+        if (a % 4 * np.pi) > _EPS:
+            self._attach(RZGate(a, self.qargs[0]))
+        if (b % 4 * np.pi) > _EPS:
+            self._attach(RYGate(b,  self.qargs[0]))
+        if (c % 4 * np.pi) > _EPS:
+            self._attach(RZGate(c,  self.qargs[0]))
 
     def _zyz_dec(self):
         """

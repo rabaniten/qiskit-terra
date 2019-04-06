@@ -100,9 +100,11 @@ class UCRot(CompositeGate):  # pylint: disable=abstract-method
             # Now, it is easy to place the C-NOT gates to get out the full decomposition.
             for i in range(len(angles)):
                 if self.rot_axes == "Z":
-                    self._attach(RZGate(angles[i], self.q_target))
+                    if (angles[i] % 4 * np.pi) > _EPS:
+                        self._attach(RZGate(angles[i], self.q_target))
                 if self.rot_axes == "Y":
-                    self._attach(RYGate(angles[i], self.q_target))
+                    if (angles[i] % 4 * np.pi) > _EPS:
+                        self._attach(RYGate(angles[i], self.q_target))
                 # The number of the control qubit (labeling the control qubits from the bottom to the top,
                 # starting with zero) is given by the number of zeros at the end of the binary representation of (i+1)
                 if not i == len(angles) - 1:
