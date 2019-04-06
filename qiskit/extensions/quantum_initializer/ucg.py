@@ -137,9 +137,8 @@ class UCG(CompositeGate):  # pylint: disable=abstract-method
                 len_ucg = 2 ** (num_contr - dec_step)
                 for i in range(int(len_ucg / 2)):
                     shift = ucg_index * len_ucg
-                    # Cast input gates to numpy.matrix (necessary in the case where an np.array was provided)
-                    a = np.asmatrix(single_qubit_gates[shift + i])
-                    b = np.asmatrix(single_qubit_gates[shift + len_ucg // 2 + i])
+                    a = single_qubit_gates[shift + i]
+                    b =single_qubit_gates[shift + len_ucg // 2 + i]
                     # Apply the decomposition for UCGs given in in equation (3) in
                     # https://arxiv.org/pdf/quant-ph/0410066.pdf
                     # to demultiplex one control of all the num_ucgs uniformly-controlled gates
@@ -158,20 +157,20 @@ class UCG(CompositeGate):  # pylint: disable=abstract-method
                         # Absorb the Rz(pi/2) rotation on the control into the UC-Rz gate and
                         # merge the UC-Rz rotation with the following UCG, which hasn't been decomposed yet.
                         k = shift + len_ucg + i
-                        single_qubit_gates[k] = single_qubit_gates[k] * r.getH()*rz(np.pi/2).item((0,0))
+                        single_qubit_gates[k] = single_qubit_gates[k].dot(ct(r))*rz(np.pi/2).item((0,0))
                         k = k + len_ucg // 2
-                        single_qubit_gates[k] = single_qubit_gates[k] * r*rz(np.pi/2).item((1,1))
+                        single_qubit_gates[k] = single_qubit_gates[k].dot(r)*rz(np.pi/2).item((1,1))
                     else:
                         # Absorb the Rz(pi/2) rotation on the control into the UC-Rz gate and
                         # Merge the trailing UC-Rz rotation into a diagonal gate at the end of the circuit
                         for ucg_index_2 in range(num_ucgs):
                             shift_2 = ucg_index_2 * len_ucg
                             k = 2 * (i + shift_2)
-                            diag[k] *= r.getH().item((0, 0))*rz(np.pi/2).item((0,0))
-                            diag[k + 1] *= r.getH().item((1, 1))*rz(np.pi/2).item((0,0))
+                            diag[k] = diag[k] * ct(r).item((0, 0)) * rz(np.pi / 2).item((0, 0))
+                            diag[k + 1] = diag[k + 1] * ct(r).item((1, 1)) * rz(np.pi / 2).item((0, 0))
                             k = len_ucg + k
-                            diag[k] *= r.item((0, 0))*rz(np.pi/2).item((1,1))
-                            diag[k + 1] *= r.item((1, 1))*rz(np.pi/2).item((1,1))
+                            diag[k] *= r.item((0, 0)) * rz(np.pi / 2).item((1, 1))
+                            diag[k + 1] *= r.item((1, 1)) * rz(np.pi / 2).item((1, 1))
         return single_qubit_gates, diag
 
     def _demultiplex_single_uc(self, a, b):
@@ -182,22 +181,25 @@ class UCG(CompositeGate):  # pylint: disable=abstract-method
         v,u,r = outcome of the decomposition given in the reference (see there for the details).
         """
         # The notation is chosen as in https://arxiv.org/pdf/quant-ph/0410066.pdf.
-        x = a * b.getH()
+        x = a.dot(ct(b))
         det_x = np.linalg.det(x)
         x11 = x.item((0,0))/ cmath.sqrt(det_x)
         phi = cmath.phase(det_x)
         r1 = cmath.exp(1j / 2 * (np.pi / 2 - phi / 2 - cmath.phase(x11)))
         r2 = cmath.exp(1j / 2 * (np.pi / 2 - phi / 2 + cmath.phase(x11) + np.pi))
-        r = np.matrix([[r1, 0], [0, r2]], dtype=complex)
-        d, u = np.linalg.eig(r * x * r)
+        r = np.array([[r1, 0], [0, r2]], dtype=complex)
+        d, u = np.linalg.eig(r.dot(x).dot(r))
         # If d is not equal to diag(i,-i), then it we must have diag(i,-i). We interchange the eigenvalues and
         # eigenvectors to get it to the "standard" form given in https://arxiv.org/pdf/quant-ph/0410066.pdf.
         if abs(d[0] + 1j) < _EPS:
             d = np.flip(d, 0)
             u = np.flip(u, 1)
         d = np.diag(np.sqrt(d))
-        v = d * u.getH() * r.getH() * b
+        v = d.dot(ct(u)).dot(ct(r)).dot(b)
         return v, u, r
+
+def ct(m):
+    return np.transpose(np.conjugate(m))
 
 def h():
     return 1/np.sqrt(2)*np.matrix([[1,1],[1,-1]])

@@ -27,7 +27,7 @@
 # pylint: disable=missing-docstring
 
 """
-Decomposition for uniformly conteolled R_z rotation test.
+Decomposition for uniformly ccontrolled R_z rotation test.
 """
 
 import unittest
@@ -58,6 +58,9 @@ class TestUCY(QiskitTestCase):
                 if binary_rep[j] == 1:
                     qc.x(q[- (j+1)])
             qc.ucy(angles, q[1:num_con+1], q[0])
+            # ToDo: improve efficiency here by allowing to execute circuit on several states in parallel (this would
+            # ToDo: in particular allow to get out the isometry the circuit is implementing by applying it to the first
+            # ToDo: few basis vectors
             vec_out = np.asarray(q_execute(qc, BasicAer.get_backend(
                 'statevector_simulator')).result().get_statevector(qc, decimals=16))
             vec_desired = apply_ucy_to_basis_state(angles, i)
@@ -73,7 +76,6 @@ class TestUCY(QiskitTestCase):
             self.assertAlmostEqual(dist, 0)
 
 def apply_ucy_to_basis_state(angles, basis_state):
-    # ToDo: improve efficiency here by implementing a simulation for UCGs
     num_qubits = int(np.log2(len(angles))+1)
     angle = angles[basis_state//2]
     ry = np.array([[np.cos(angle/2), - np.sin(angle/2)], [np.sin(angle/2), np.cos(angle/2)]])
