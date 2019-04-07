@@ -12,5 +12,5 @@ from .ucg import UCG
 from .zyz_dec import SingleQubitUnitary
 from .ucz import UCZ
 from .ucy import UCY
-from ._diag import DiagGate
+from .diag import DiagGate
 from .ucg import UCG

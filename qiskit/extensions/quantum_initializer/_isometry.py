@@ -22,6 +22,9 @@ from qiskit.circuit import Gate
 from qiskit.extensions.standard.cx import CnotGate
 from qiskit.extensions.standard.ry import RYGate
 from qiskit.extensions.standard.rz import RZGate
+import itertools
+
+
 
 _EPS = 1e-10  # global variable used to chop very small numbers to zero
 
@@ -132,6 +135,10 @@ class Isometry(CompositeGate):  # pylint: disable=abstract-method
         self._attach(self._multiplex(RZGate, i, phis))
         self._attach(self._multiplex(RYGate, i, thetas))
 
+
+
+
+
     @staticmethod
     def _rotations_to_disentangle(local_param):
         """
@@ -198,249 +205,6 @@ class Isometry(CompositeGate):  # pylint: disable=abstract-method
 
         return final_r * np.exp(1.J * final_t/2), theta, phi
 
-    def _multiplex(self, bottom_gate, bottom_qubit_index, list_of_angles):
-        """
-        Internal recursive method to create gates to perform rotations on the
-        imaginary qubits: works by rotating LSB (and hence ALL imaginary
-        qubits) by combo angle and then flipping sign (by flipping the bit,
-        hence moving the complex amplitudes) of half the imaginary qubits
-        (CNOT) followed by another combo angle on LSB, therefore executing
-        conditional (on MSB) rotations, thereby disentangling LSB.
-        """
-        list_len = len(list_of_angles)
-        target_qubit = self.nth_qubit_from_least_sig_qubit(bottom_qubit_index)
-
-        # Case of no multiplexing = base case for recursion
-        if list_len == 1:
-            return bottom_gate(list_of_angles[0], target_qubit)
-
-        local_num_qubits = int(math.log2(list_len)) + 1
-        control_qubit = self.nth_qubit_from_least_sig_qubit(
-            local_num_qubits - 1 + bottom_qubit_index)
-
-        # calc angle weights, assuming recursion (that is the lower-level
-        # requested angles have been correctly implemented by recursion
-        angle_weight = scipy.kron([[0.5, 0.5], [0.5, -0.5]],
-                                  np.identity(2 ** (local_num_qubits - 2)))
-
-        # calc the combo angles
-        list_of_angles = angle_weight.dot(np.array(list_of_angles)).tolist()
-        combine_composite_gates = CompositeGate(
-            "multiplex" + local_num_qubits.__str__(), [], self.qargs)
-
-        # recursive step on half the angles fulfilling the above assumption
-        combine_composite_gates._attach(
-            self._multiplex(bottom_gate, bottom_qubit_index,
-                            list_of_angles[0:(list_len // 2)]))
-
-        # combine_composite_gates.cx(control_qubit,target_qubit) -> does not
-        # work as expected because checks circuit
-        # so attach CNOT as follows, thereby flipping the LSB qubit
-        combine_composite_gates._attach(CnotGate(control_qubit, target_qubit))
-
-        # implement extra efficiency from the paper of cancelling adjacent
-        # CNOTs (by leaving out last CNOT and reversing (NOT inverting) the
-        # second lower-level multiplex)
-        sub_gate = self._multiplex(
-            bottom_gate, bottom_qubit_index, list_of_angles[(list_len // 2):])
-        if isinstance(sub_gate, CompositeGate):
-            combine_composite_gates._attach(sub_gate.reverse())
-        else:
-            combine_composite_gates._attach(sub_gate)
-
-        # outer multiplex keeps final CNOT, because no adjacent CNOT to cancel
-        # with
-        if self.num_qubits == local_num_qubits + bottom_qubit_index:
-            combine_composite_gates._attach(CnotGate(control_qubit,
-                                                     target_qubit))
-
-        return combine_composite_gates
-
-    @staticmethod
-    def chop_num(numb):
-        """
-        Set very small numbers (as defined by global variable _EPS) to zero.
-        """
-        return 0 if abs(numb) < _EPS else numb
-
-
-# ###############################################################
-# Add needed functionality to other classes (it feels
-# weird following the Qiskit convention of adding functionality to other
-# classes like this ;),
-#  TODO: multiple inheritance might be better?)
-
-
-def reverse(self):
-    """
-    Reverse (recursively) the sub-gates of this CompositeGate. Note this does
-    not invert the gates!
-    """
-    new_data = []
-    for gate in reversed(self.data):
-        if isinstance(gate, CompositeGate):
-            new_data.append(gate.reverse())
-        else:
-            new_data.append(gate)
-    self.data = new_data
-
-    # not just a high-level reverse:
-    # self.data = [gate for gate in reversed(self.data)]
-
-    return self
-
-
-QuantumCircuit.reverse = reverse
-CompositeGate.reverse = reverse
-
-
-def optimize_gates(self):
-    """Remove Zero rotations and Double CNOTS."""
-    self.remove_zero_rotations()
-    while self.remove_double_cnots_once():
-        pass
-
-
-QuantumCircuit.optimize_gates = optimize_gates
-CompositeGate.optimize_gates = optimize_gates
-
-
-def remove_zero_rotations(self):
-    """
-    Remove Zero Rotations by looking (recursively) at rotation gates at the
-    leaf ends.
-    """
-    # Removed at least one zero rotation.
-    zero_rotation_removed = False
-    new_data = []
-    for gate in self.data:
-        if isinstance(gate, CompositeGate):
-            zero_rotation_removed |= gate.remove_zero_rotations()
-            if gate.data:
-                new_data.append(gate)
-        else:
-            if ((not isinstance(gate, Gate)) or
-                    (not (gate.name == "rz" or gate.name == "ry" or
-                          gate.name == "rx") or
-                     (InitializeGate.chop_num(gate.params[0]) != 0))):
-                new_data.append(gate)
-            else:
-                zero_rotation_removed = True
-
-    self.data = new_data
-
-    return zero_rotation_removed
-
-
-QuantumCircuit.remove_zero_rotations = remove_zero_rotations
-CompositeGate.remove_zero_rotations = remove_zero_rotations
-
-
-def number_atomic_gates(self):
-    """Count the number of leaf gates. """
-    num = 0
-    for gate in self.data:
-        if isinstance(gate, CompositeGate):
-            num += gate.number_atomic_gates()
-        else:
-            if isinstance(gate, Gate):
-                num += 1
-    return num
-
-
-QuantumCircuit.number_atomic_gates = number_atomic_gates
-CompositeGate.number_atomic_gates = number_atomic_gates
-
-
-def remove_double_cnots_once(self):
-    """
-    Remove Double CNOTS paying attention that gates may be neighbours across
-    Composite Gate boundaries.
-    """
-    num_high_level_gates = len(self.data)
-
-    if num_high_level_gates == 0:
-        return False
-    else:
-        if num_high_level_gates == 1 and isinstance(self.data[0],
-                                                    CompositeGate):
-            return self.data[0].remove_double_cnots_once()
-
-    # Removed at least one double cnot.
-    double_cnot_removed = False
-
-    # last gate might be composite
-    if isinstance(self.data[num_high_level_gates - 1], CompositeGate):
-        double_cnot_removed = \
-            double_cnot_removed or\
-            self.data[num_high_level_gates - 1].remove_double_cnots_once()
-
-    # don't start with last gate, using reversed so that can del on the go
-    for i in reversed(range(num_high_level_gates - 1)):
-        if isinstance(self.data[i], CompositeGate):
-            double_cnot_removed =\
-                double_cnot_removed \
-                or self.data[i].remove_double_cnots_once()
-            left_gate_host = self.data[i].last_atomic_gate_host()
-            left_gate_index = -1
-            # TODO: consider adding if semantics needed:
-            # to remove empty composite gates
-            # if left_gate_host == None: del self.data[i]
-        else:
-            left_gate_host = self.data
-            left_gate_index = i
-
-        if ((left_gate_host is not None) and
-                left_gate_host[left_gate_index].name == "cx"):
-            if isinstance(self.data[i + 1], CompositeGate):
-                right_gate_host = self.data[i + 1].first_atomic_gate_host()
-                right_gate_index = 0
-            else:
-                right_gate_host = self.data
-                right_gate_index = i + 1
-
-            if (right_gate_host is not None) \
-                    and right_gate_host[right_gate_index].name == "cx" \
-                    and (left_gate_host[left_gate_index].qargs ==
-                         right_gate_host[right_gate_index].qargs):
-                del right_gate_host[right_gate_index]
-                del left_gate_host[left_gate_index]
-                double_cnot_removed = True
-
-    return double_cnot_removed
-
-
-QuantumCircuit.remove_double_cnots_once = remove_double_cnots_once
-CompositeGate.remove_double_cnots_once = remove_double_cnots_once
-
-
-def first_atomic_gate_host(self):
-    """Return the host list of the leaf gate on the left edge."""
-    if self.data:
-        if isinstance(self.data[0], CompositeGate):
-            return self.data[0].first_atomic_gate_host()
-        return self.data
-
-    return None
-
-
-QuantumCircuit.first_atomic_gate_host = first_atomic_gate_host
-CompositeGate.first_atomic_gate_host = first_atomic_gate_host
-
-
-def last_atomic_gate_host(self):
-    """Return the host list of the leaf gate on the right edge."""
-    if self.data:
-        if isinstance(self.data[-1], CompositeGate):
-            return self.data[-1].last_atomic_gate_host()
-        return self.data
-
-    return None
-
-
-QuantumCircuit.last_atomic_gate_host = last_atomic_gate_host
-CompositeGate.last_atomic_gate_host = last_atomic_gate_host
-
 
 def initialize(self, params, qubits):
     """Apply initialize to circuit."""
@@ -448,6 +212,102 @@ def initialize(self, params, qubits):
     # TODO: avoid explicit reset if compiler determines a |0> state
     return self._attach(InitializeGate(params, qubits, self))
 
+
+    # Input: matrix m with 2^n rows (and arbitrary many columns). Think of the columns as states on n qubits. The method
+    # applies a uniformly controlled gate (UCG) to all the columns, where the UCG is specified by the inputs k and
+    # single_qubit_gates:
+
+    #  k = number of controls. We assume that the controls are on the k most significant qubits (and the target is on
+    #       the (k+1)th significant qubit
+    #  single_qubit_gates = [u_0,...,u_{2^k-1}], where the u_i are 2*2 unitaries (provided as numpy arrays)
+    #
+
+    # The order of the single-qubit unitaries is such that the first unitary u_0 is applied to the (k+1)th significant qubit
+    # if the control qubits are in the state ket(0...00), the gate u_1 is applied if the control qubits are in the state
+    # ket(0...01), and so on.
+
+
+def a(k, s):
+    return k // 2**s
+
+
+def b(k, s):
+    return k - (a(k, s) * 2**s)
+
+def _apply_uniformly_controlled_gate(m, k, single_qubit_gates):
+    # ToDo: Improve efficiency by parallelizing the gate application
+    num_qubits = int(np.log2(m.shape[0]))
+    num_col= m.shape[1]
+    spacing = 2**(num_qubits - k -1)
+    for j in range(2**(num_qubits-1)):
+        i = (j //spacing) * spacing + j
+        gate_index = i//(2**(num_qubits - k))
+        for l in range(num_col):
+            m[np.array([i,i+spacing]),np.array([l,l])] = \
+                np.ndarray.flatten(single_qubit_gates[gate_index].dot(np.array([[m[i,l]],[m[i+spacing,l]]]))).tolist()
+
+def _apply_diagonal_gate(m, controls, target, gate):
+    # ToDo: Improve efficiency
+    num_qubits = int(np.log2(m.shape[0]))
+    num_cols = m.shape[1]
+    controls.sort()
+    free_qubits = num_qubits - len(controls) - 1
+    basis_states_free = list(itertools.product([0, 1], repeat=free_qubits))
+    for state_free in basis_states_free:
+        (e1, e2) = _construct_basis_states(state_free, controls,target)
+        for l in range(num_cols):
+            m[np.array([e1, e2]), np.array([l, l])] = \
+                np.ndarray.flatten(gate.dot(np.array([[m[e1, l]], [m[e2, l]]]))).tolist()
+    return m
+
+def _apply_multi_controlled_gate(m, controls, target, gate):
+    # ToDo: Improve efficiency
+    num_qubits = int(np.log2(m.shape[0]))
+    num_cols = m.shape[1]
+    controls.sort()
+    free_qubits = num_qubits - len(controls) - 1
+    basis_states_free = list(itertools.product([0, 1], repeat=free_qubits))
+    for state_free in basis_states_free:
+        (e1, e2) = _construct_basis_states(state_free, controls,target)
+        for l in range(num_cols):
+            m[np.array([e1, e2]), np.array([l, l])] = \
+                np.ndarray.flatten(gate.dot(np.array([[m[e1, l]], [m[e2, l]]]))).tolist()
+    return m
+
+def _construct_basis_states(state_free, controls, target):
+    e1 =[]
+    e2 =[]
+    j = 0
+    for i in range(len(state_free)+len(controls)+1):
+        if i in controls:
+            e1.append(1)
+            e2.append(1)
+        elif i == target:
+            e1.append(0)
+            e2.append(1)
+        else:
+            e1.append(state_free[j])
+            e2.append(state_free[j])
+            j += 1
+    # Convert list of binary digits to integer
+    out1 = int("".join(str(x) for x in e1), 2)
+    out2 = int("".join(str(x) for x in e2), 2)
+    return out1, out2
+
+# Find special unitary matrix that maps [c0,c1] to [r,0] or [0,r] if basis_state=0 or basis_state=1 respectively
+def reverse_qubit_state(state, basis_state):
+    state= np.array(state)
+    r = np.linalg.norm(state)
+    if r < _EPS:
+        return np.eye(2,2)
+    if basis_state == 0:
+        m = np.array([[np.conj(state[0]), np.conj(state[1])], [-state[1], state[0]]]) / r
+    else:
+        m = np.array([[-state[1], state[0]],[np.conj(state[0]), np.conj(state[1])]]) / r
+    return m
+
+def ct(m):
+    return np.transpose(np.conjugate(m))
 
 def is_isometry(m, eps):
     err = np.linalg.norm(np.dot(np.transpose(np.conj(m)), m) - np.eye(m.shape[1], m.shape[1]))

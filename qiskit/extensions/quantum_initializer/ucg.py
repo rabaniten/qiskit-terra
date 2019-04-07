@@ -20,7 +20,7 @@ from qiskit.circuit import CompositeGate
 from qiskit.circuit.quantumcircuit import QuantumRegister, QuantumCircuit
 from qiskit.exceptions import QiskitError
 from qiskit.extensions.quantum_initializer._isometry import is_isometry
-from qiskit.extensions.quantum_initializer._diag import DiagGate
+from qiskit.extensions.quantum_initializer.diag import DiagGate
 from qiskit.extensions.quantum_initializer.zyz_dec import SingleQubitUnitary
 from qiskit.extensions.standard.cx import CnotGate
 import cmath
