@@ -18,7 +18,7 @@ import numpy as np
 from qiskit.circuit import CompositeGate
 from qiskit.circuit.quantumcircuit import QuantumRegister, QuantumCircuit
 from qiskit.exceptions import QiskitError
-from qiskit.extensions.quantum_initializer._isometry import is_isometry
+from qiskit.extensions.quantum_initializer.isometry import is_isometry
 from qiskit.extensions.standard.ry import RYGate
 from qiskit.extensions.standard.rz import RZGate
 

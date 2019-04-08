@@ -8,9 +8,9 @@
 """Initialize qubit registers to desired arbitrary state."""
 
 from ._initializer import InitializeGate
-from .ucg import UCG
 from .zyz_dec import SingleQubitUnitary
 from .ucz import UCZ
 from .ucy import UCY
 from .diag import DiagGate
 from .ucg import UCG
+from .isometry import Isometry

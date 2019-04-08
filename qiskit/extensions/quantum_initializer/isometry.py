@@ -16,9 +16,7 @@ import scipy
 from qiskit.exceptions import QiskitError
 from qiskit.circuit import QuantumCircuit
 from qiskit.circuit import CompositeGate
-from qiskit.circuit import Gate
-from qiskit.extensions.standard.cx import CnotGate
-from qiskit.extensions.standard.ry import RYGate
+from qiskit.extensions.quantum_initializer.ucg import UCG
 from qiskit.extensions.quantum_initializer.diag import DiagGate
 
 import itertools
@@ -179,8 +177,8 @@ class Isometry(CompositeGate):  # pylint: disable=abstract-method
     def _attach_ucg_up_to_diagonal(self, single_qubit_gates, control_labels, target_label):
         n = np.log2(self.params.shape[0])
         qubits = self.q_input + self.q_ancillas_output
-        ucg = qiskit.extensions.quantum_initializer.ucg.UCG(single_qubit_gates, _get_qubits_by_label(control_labels, qubits),
-                                                            _get_qubits_by_label(target_label, qubits)[0], up_to_diagonal=True)
+        ucg = UCG(single_qubit_gates, _get_qubits_by_label(control_labels, qubits),
+                  _get_qubits_by_label(target_label, qubits)[0], up_to_diagonal=True)
         return ucg.diag
 
     def _attach_mcg_up_to_diagonal(self, gate, control_labels, target_label):
@@ -366,6 +364,7 @@ def is_isometry(m, eps):
 #         qubit_numbers.append(qubit[1])
 #     return not (len(qubit_numbers) == len(set(qubit_numbers)))
 
+
 def get_binary_rep_as_list(n, num_digits):
     binary_string = np.binary_repr(n).zfill(num_digits)
     binary = []
@@ -374,8 +373,17 @@ def get_binary_rep_as_list(n, num_digits):
             binary.append(int(c))
     return binary
 
+
 def is_identity(single_qubit_gates):
     for gate in single_qubit_gates:
         if not np.allclose(gate,np.eye(2,2)):
             return False
     return True
+
+
+def iso(self, isometry, q_input, q_ancillas_for_output, q_ancillas_zero=[], q_ancillas_dirty=[]):
+    return self._attach(Isometry(isometry, q_input, q_ancillas_for_output, q_ancillas_zero, q_ancillas_dirty, self))
+
+
+QuantumCircuit.iso = iso
+CompositeGate.iso = iso

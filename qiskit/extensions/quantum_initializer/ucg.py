@@ -20,7 +20,6 @@ import numpy as np
 from qiskit.circuit import CompositeGate
 from qiskit.circuit.quantumcircuit import QuantumRegister, QuantumCircuit
 from qiskit.exceptions import QiskitError
-from qiskit.extensions.quantum_initializer._isometry import is_isometry
 from qiskit.extensions.quantum_initializer.diag import DiagGate
 from qiskit.extensions.quantum_initializer.zyz_dec import SingleQubitUnitary
 from qiskit.extensions.standard.cx import CnotGate
@@ -215,6 +214,11 @@ def h():
 
 def rz(alpha):
     return np.array([[np.exp(1j*alpha/2),0],[0,np.exp(-1j*alpha/2)]])
+
+
+def is_isometry(m, eps):
+    err = np.linalg.norm(np.dot(np.transpose(np.conj(m)), m) - np.eye(m.shape[1], m.shape[1]))
+    return math.isclose(err, 0, abs_tol=eps)
 
 def ucg(self, gate_list, q_controls, q_target, up_to_diagonal = False):
     return self._attach(UCG(gate_list, q_controls, q_target, up_to_diagonal, self))
