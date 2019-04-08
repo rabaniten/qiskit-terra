@@ -18,7 +18,6 @@ import numpy as np
 from qiskit.circuit import CompositeGate
 from qiskit.circuit.quantumcircuit import QuantumRegister, QuantumCircuit
 from qiskit.exceptions import QiskitError
-from qiskit.extensions.quantum_initializer.isometry import is_isometry
 from qiskit.extensions.standard.ry import RYGate
 from qiskit.extensions.standard.rz import RZGate
 
@@ -103,9 +102,13 @@ class SingleQubitUnitary(CompositeGate):  # pylint: disable=abstract-method
         return -a, -b, -c, d
 
 
+def is_isometry(m, eps):
+    err = np.linalg.norm(np.dot(np.transpose(np.conj(m)), m) - np.eye(m.shape[1], m.shape[1]))
+    return math.isclose(err, 0, abs_tol=eps)
+
+
 def zyz(self, params, qubits, up_to_diagonal=False):
     return self._attach(SingleQubitUnitary(params, qubits, up_to_diagonal, self))
-
 
 QuantumCircuit.zyz = zyz
 CompositeGate.zyz = zyz
