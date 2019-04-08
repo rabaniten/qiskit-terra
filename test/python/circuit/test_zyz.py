@@ -20,6 +20,7 @@ from qiskit.quantum_info import state_fidelity
 from qiskit.test import QiskitTestCase
 import numpy as np
 from scipy.stats import unitary_group
+from qiskit.extensions.quantum_initializer.zyz_dec import SingleQubitUnitary
 
 
 class TestZYZ(QiskitTestCase):
@@ -53,8 +54,16 @@ class TestZYZ(QiskitTestCase):
             fidelity, self._desired_fidelity,
             "Initializer has low fidelity {0:.2g}.".format(fidelity))
 
+    def test_random_up_to_diagonal(self):
+        u = unitary_group.rvs(2)
+        fidelity = _get_fidelity_zyz_dec(u, up_to_diagonal=True)
+        print(fidelity)
+        self.assertGreater(
+            fidelity, self._desired_fidelity,
+            "Initializer has low fidelity {0:.2g}.".format(fidelity))
 
-def _get_fidelity_zyz_dec(u):
+
+def _get_fidelity_zyz_dec(u, up_to_diagonal=False):
     qr = QuantumRegister(2, "qr")
     qc = QuantumCircuit(qr)
     # To test a unitary, we apply it to the maximally entangled state. This lead to the Choi state of the unitary,
@@ -65,7 +74,13 @@ def _get_fidelity_zyz_dec(u):
     job = execute(qc, BasicAer.get_backend('statevector_simulator'))
     result = job.result()
     statevector = result.get_statevector()
-    fidelity = state_fidelity(statevector, desired_vector)
+    if up_to_diagonal:
+        squ = SingleQubitUnitary(u, qr[0], up_to_diagonal=True)
+        statevector[0] *= squ.diag[0]
+        statevector[1] *= squ.diag[1]
+        fidelity = state_fidelity(statevector, desired_vector)
+    else:
+        fidelity = state_fidelity(statevector, desired_vector)
     return fidelity
 
 

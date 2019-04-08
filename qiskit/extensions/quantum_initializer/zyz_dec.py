@@ -32,7 +32,7 @@ class SingleQubitUnitary(CompositeGate):  # pylint: disable=abstract-method
     circ = QuantumCircuit or CompositeGate containing this gate
     """
 
-    def __init__(self, u, q, circ=None):
+    def __init__(self, u, q, up_to_diagonal = False, circ=None):
         # Check if the matrix u has the right dimensions and if it is a unitary
         # if not type(u) == np.ndarray:
         #     raise QiskitError("The input matrix u is not of type numpy.ndarray.")
@@ -48,9 +48,10 @@ class SingleQubitUnitary(CompositeGate):  # pylint: disable=abstract-method
         # Create new composite gate.
         super().__init__("init", [u], [q], circ)
         # Decompose the single-qubit unitary (and save the elementary gate into self.data)
-        self._dec_single_qubit_unitary()
+        self._dec_single_qubit_unitary(up_to_diagonal)
+        self.diag = [1, 1]
 
-    def _dec_single_qubit_unitary(self):
+    def _dec_single_qubit_unitary(self, up_to_diagonal=False):
         """
         Call to populate the self.data list with gates that implement the single qubit unitary
         """
@@ -62,7 +63,10 @@ class SingleQubitUnitary(CompositeGate):  # pylint: disable=abstract-method
         if (b % 4 * np.pi) > _EPS:
             self._attach(RYGate(b,  self.qargs[0]))
         if (c % 4 * np.pi) > _EPS:
-            self._attach(RZGate(c,  self.qargs[0]))
+            if up_to_diagonal:
+                self.diag = [np.exp(-1j*c/2.), np.exp(1j*c/2.)]
+            else:
+                self._attach(RZGate(c, self.qargs[0]))
 
     def _zyz_dec(self):
         """
@@ -99,8 +103,8 @@ class SingleQubitUnitary(CompositeGate):  # pylint: disable=abstract-method
         return -a, -b, -c, d
 
 
-def zyz(self, params, qubits):
-    return self._attach(SingleQubitUnitary(params, qubits, self))
+def zyz(self, params, qubits, up_to_diagonal=False):
+    return self._attach(SingleQubitUnitary(params, qubits, up_to_diagonal, self))
 
 
 QuantumCircuit.zyz = zyz
