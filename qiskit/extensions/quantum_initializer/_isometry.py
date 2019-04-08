@@ -5,8 +5,6 @@
 # This source code is licensed under the Apache License, Version 2.0 found in
 # the LICENSE.txt file in the root directory of this source tree.
 
-# The structure of the code is based on Emanuel Malvetti's semester thesis at ETH in 2018, which was supervised by Raban Iten and Prof. Renato Renner.
-
 """
 Arbitrary isometry from m to n qubits.
 """
@@ -22,6 +20,9 @@ from qiskit.circuit import Gate
 from qiskit.extensions.standard.cx import CnotGate
 from qiskit.extensions.standard.ry import RYGate
 from qiskit.extensions.standard.rz import RZGate
+from qiskit.extensions.quantum_initializer.ucg import UCG
+
+
 import itertools
 
 
@@ -35,9 +36,6 @@ class Isometry(CompositeGate):  # pylint: disable=abstract-method
 
     The decomposition is based on https://arxiv.org/abs/1501.06911.
 
-    Additionally implements some extra optimizations: remove zero rotations and
-    double cnots.`
-
     It inherits from CompositeGate in the same way that the Fredkin (cswap)
     gate does. Therefore self.data is the list of gates (in order) that must
     be applied to implement this meta-gate.
@@ -49,7 +47,6 @@ class Isometry(CompositeGate):  # pylint: disable=abstract-method
     q_ancilla = list of ancilla qubits (which are assumed to start in the zero state)
     circ = QuantumCircuit or CompositeGate containing this gate
     """
-
 
     def __init__(self, isometry, q_ancillas, q_input, circ=None):
         self.q_controls = q_controls
@@ -107,8 +104,8 @@ class Isometry(CompositeGate):  # pylint: disable=abstract-method
         desired isometry to the first 2^m columns of the 2^n*2^n identity matrix (see https://arxiv.org/abs/1501.06911)
         """
         # Copy the isometry (this is computationally expensive for large isometries but garantees to keep a copy of the input isometry)
-        remaining_isometry = np.copy(self.params)
-        phases=[]
+        remaining_isometry = self.params.astype(complex) #note that "astype" does copy the isometry
+        phases =[]
         n = np.log2(self.params.shape[0])
         m = np.log2(self.params.shape[1])
 
@@ -122,16 +119,36 @@ class Isometry(CompositeGate):  # pylint: disable=abstract-method
         """
         Decomposes the column with index column_index.
         """
+        n = np.log2(self.params.shape[0])
+        for s in range(n):
+            self.disentangle(phases, remaining_isometry,column_index, s)
 
 
+    def _disentangle(self,phases,remaining_isometry,column_index, s):
+        """
+        Disentangle the sth significant qubit (starting with s=0) into the zero or the one state
+        (dependent on column_index)
+        """
+        k = column_index
+        v = remaining_isometry
+        # Check if a MCG is required
+        index1 = 2*a(k,s+1)*2**s+b(k,s+1)
+        index2 = (2*a(k,s+1)+1)*2**s+b(k,s+1)
+        target = n - s
+        if a(k,s) == 0 and b(k,s+1) != 0 and np.abs(v[index2,k]) > _EPS:
+            # find the MCG
+            gate = reverse_qubit_state([v[index1,k],v[index2,k]],0)
+            control_labels =  [i for i, x in enumerate(get_binary_rep_as_list(k)) if x == 1 and i != target]
 
-        # work out which rotations must be done to disentangle the LSB
-        # qubit (we peel away one qubit at a time)
-        (remaining_isometry, thetas, phis) = InitializeGate._rotations_to_disentangle(remaining_isometry)
+    def _add_mcg_up_to_diagonal(self, gate, control_labels):
+        n = np.log2(self.params.shape[0])
+        if n 
+        self._attach()
 
-        # perform the required rotations to decouple the LSB qubit (so that
-        # it can be "factored" out, leaving a
-        # shorter amplitude vector to peel away)
+
+        m = np.log2(self.params.shape[1])
+        for s in range(n):                                                   # it can be "factored" out, leaving a
+            self.disentangle(column_index, s)                                        return reductions, diagonal.decomposition# shorter amplitude vector to peel away)
         self._attach(self._multiplex(RZGate, i, phis))
         self._attach(self._multiplex(RYGate, i, thetas))
 
@@ -234,10 +251,15 @@ def a(k, s):
 def b(k, s):
     return k - (a(k, s) * 2**s)
 
+# The input matrix m and the single qubit gates have to be of dtype=complex
+# The qubit labels are such that label 0 corresponds to the most significant qubit, label 1 to the second most
+# significant qubit, and so on ...
+
+
 def _apply_uniformly_controlled_gate(m, k, single_qubit_gates):
     # ToDo: Improve efficiency by parallelizing the gate application
     num_qubits = int(np.log2(m.shape[0]))
-    num_col= m.shape[1]
+    num_col = m.shape[1]
     spacing = 2**(num_qubits - k -1)
     for j in range(2**(num_qubits-1)):
         i = (j //spacing) * spacing + j
@@ -245,54 +267,71 @@ def _apply_uniformly_controlled_gate(m, k, single_qubit_gates):
         for l in range(num_col):
             m[np.array([i,i+spacing]),np.array([l,l])] = \
                 np.ndarray.flatten(single_qubit_gates[gate_index].dot(np.array([[m[i,l]],[m[i+spacing,l]]]))).tolist()
+    return m
 
-def _apply_diagonal_gate(m, controls, target, gate):
+# The input matrix m has to be of dtype=complex
+# The qubit labels are such that label 0 corresponds to the most significant qubit, label 1 to the second most
+# significant qubit, and so on ...
+
+
+def _apply_diagonal_gate(m, action_qubit_labels, diag):
     # ToDo: Improve efficiency
     num_qubits = int(np.log2(m.shape[0]))
     num_cols = m.shape[1]
-    controls.sort()
-    free_qubits = num_qubits - len(controls) - 1
+    action_qubit_labels.sort()
+    basis_states= list(itertools.product([0, 1], repeat=num_qubits))
+    for state in basis_states:
+        state_on_action_qubits = [state[i] for i in action_qubit_labels]
+        diag_index = bin_to_int(state_on_action_qubits)
+        i = bin_to_int(state)
+        for j in range(num_cols):
+            m[i,j] = diag[diag_index] * m[i, j]
+    return m
+
+# The input matrix m and the gate have to be of dtype=complex
+# The qubit labels are such that label 0 corresponds to the most significant qubit, label 1 to the second most
+# significant qubit, and so on ...
+
+
+def _apply_multi_controlled_gate(m, control_labels, target_label, gate):
+    # ToDo: Improve efficiency
+    num_qubits = int(np.log2(m.shape[0]))
+    num_cols = m.shape[1]
+    control_labels.sort()
+    free_qubits = num_qubits - len(control_labels) - 1
     basis_states_free = list(itertools.product([0, 1], repeat=free_qubits))
     for state_free in basis_states_free:
-        (e1, e2) = _construct_basis_states(state_free, controls,target)
+        (e1, e2) = _construct_basis_states(state_free, control_labels, target_label)
         for l in range(num_cols):
             m[np.array([e1, e2]), np.array([l, l])] = \
                 np.ndarray.flatten(gate.dot(np.array([[m[e1, l]], [m[e2, l]]]))).tolist()
     return m
 
-def _apply_multi_controlled_gate(m, controls, target, gate):
-    # ToDo: Improve efficiency
-    num_qubits = int(np.log2(m.shape[0]))
-    num_cols = m.shape[1]
-    controls.sort()
-    free_qubits = num_qubits - len(controls) - 1
-    basis_states_free = list(itertools.product([0, 1], repeat=free_qubits))
-    for state_free in basis_states_free:
-        (e1, e2) = _construct_basis_states(state_free, controls,target)
-        for l in range(num_cols):
-            m[np.array([e1, e2]), np.array([l, l])] = \
-                np.ndarray.flatten(gate.dot(np.array([[m[e1, l]], [m[e2, l]]]))).tolist()
-    return m
 
-def _construct_basis_states(state_free, controls, target):
+def _construct_basis_states(state_free, control_labels, target_label):
     e1 =[]
     e2 =[]
     j = 0
-    for i in range(len(state_free)+len(controls)+1):
-        if i in controls:
+    for i in range(len(state_free) + len(control_labels) + 1):
+        if i in control_labels:
             e1.append(1)
             e2.append(1)
-        elif i == target:
+        elif i == target_label:
             e1.append(0)
             e2.append(1)
         else:
             e1.append(state_free[j])
             e2.append(state_free[j])
             j += 1
-    # Convert list of binary digits to integer
-    out1 = int("".join(str(x) for x in e1), 2)
-    out2 = int("".join(str(x) for x in e2), 2)
+    out1 = bin_to_int(e1)
+    out2 = bin_to_int(e2)
     return out1, out2
+
+
+# Convert list of binary digits to integer
+def bin_to_int(binary_digits_as_list):
+    return int("".join(str(x) for x in binary_digits_as_list), 2)
+
 
 # Find special unitary matrix that maps [c0,c1] to [r,0] or [0,r] if basis_state=0 or basis_state=1 respectively
 def reverse_qubit_state(state, basis_state):
@@ -306,13 +345,14 @@ def reverse_qubit_state(state, basis_state):
         m = np.array([[-state[1], state[0]],[np.conj(state[0]), np.conj(state[1])]]) / r
     return m
 
+
 def ct(m):
     return np.transpose(np.conjugate(m))
+
 
 def is_isometry(m, eps):
     err = np.linalg.norm(np.dot(np.transpose(np.conj(m)), m) - np.eye(m.shape[1], m.shape[1]))
     return math.isclose(err, 0, abs_tol=eps)
-
 
 # def does_same_qubit_appears_twice(qubit_list):
 #     qubit_numbers = []
@@ -320,3 +360,10 @@ def is_isometry(m, eps):
 #         qubit_numbers.append(qubit[1])
 #     return not (len(qubit_numbers) == len(set(qubit_numbers)))
 
+def get_binary_rep_as_list(n, num_digits):
+    binary_string = np.binary_repr(n).zfill(num_digits)
+    binary = []
+    for line in binary_string:
+        for c in line:
+            binary.append(int(c))
+    return binary

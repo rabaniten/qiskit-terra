@@ -5,7 +5,8 @@
 # This source code is licensed under the Apache License, Version 2.0 found in
 # the LICENSE.txt file in the root directory of this source tree.
 
-# The structure of the code is based on Emanuel Malvetti's semester thesis at ETH in 2018, which was supervised by Raban Iten and Prof. Renato Renner.
+# The structure of the code is based on Emanuel Malvetti's semester thesis at ETH in 2018,
+# which was supervised by Raban Iten and Prof. Renato Renner.
 
 """
 Uniformly controlled gates (also called multiplexed gates). These gates can have several control qubits and a single target qubit.
@@ -38,7 +39,7 @@ class UCG(CompositeGate):  # pylint: disable=abstract-method
     circ = QuantumCircuit or CompositeGate containing this gate
     """
 
-    def __init__(self, gate_list, q_controls, q_target, up_to_diagonal = False, circ=None):
+    def __init__(self, gate_list, q_controls, q_target, up_to_diagonal=False, circ=None):
         self.q_controls = q_controls
         self.q_target = q_target
         """Check types"""
@@ -99,11 +100,11 @@ class UCG(CompositeGate):  # pylint: disable=abstract-method
         for i in range(len(single_qubit_gates)):
             # Absorb Hadamards and Rz(pi/2) gates
             if i == 0:
-                squ = h()*single_qubit_gates[i]
+                squ = h().dot(single_qubit_gates[i])
             elif i == len(single_qubit_gates)-1:
-                squ = single_qubit_gates[i]*rz(np.pi/2)*h()
+                squ = single_qubit_gates[i].dot(rz(np.pi/2)).dot(h())
             else:
-                squ = h()*single_qubit_gates[i]*rz(np.pi/2)*h()
+                squ = h().dot(single_qubit_gates[i].dot(rz(np.pi/2))).dot(h())
             self._attach(SingleQubitUnitary(squ, self.q_target))
             # The number of the control qubit (labeling the control qubits from the bottom to the top,
             # starting with zero) is given by the number of zeros at the end of the binary representation of (i+1)
@@ -126,7 +127,7 @@ class UCG(CompositeGate):  # pylint: disable=abstract-method
         This method finds the single qubit gate arising in the decomposition of UCGs given in  
         https://arxiv.org/pdf/quant-ph/0410066.pdf.
         """
-        single_qubit_gates = self.params.copy()
+        single_qubit_gates = [gate.astype(complex) for gate in self.params]
         diag = np.ones(2 ** self.num_qubits, dtype=complex)
         num_contr = len(self.q_controls)
         for dec_step in range(num_contr):
@@ -202,10 +203,10 @@ def ct(m):
     return np.transpose(np.conjugate(m))
 
 def h():
-    return 1/np.sqrt(2)*np.matrix([[1,1],[1,-1]])
+    return 1/np.sqrt(2)*np.array([[1,1],[1,-1]])
 
 def rz(alpha):
-    return np.matrix([[np.exp(1j*alpha/2),0],[0,np.exp(-1j*alpha/2)]])
+    return np.array([[np.exp(1j*alpha/2),0],[0,np.exp(-1j*alpha/2)]])
 
 def ucg(self, gate_list, q_controls, q_target, up_to_diagonal = False):
     return self._attach(UCG(gate_list, q_controls, q_target, up_to_diagonal, self))

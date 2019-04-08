@@ -5,7 +5,8 @@
 # This source code is licensed under the Apache License, Version 2.0 found in
 # the LICENSE.txt file in the root directory of this source tree.
 
-# The structure of the code is based on Emanuel Malvetti's semester thesis at ETH in 2018, which was supervised by Raban Iten and Prof. Renato Renner.
+# The structure of the code is based on Emanuel Malvetti's semester thesis at ETH in 2018,
+# which was supervised by Raban Iten and Prof. Renato Renner.
 
 """
 Implementation of the abstract class UCRot for uniformly controlled (also called multiplexed) single-qubit rotations
