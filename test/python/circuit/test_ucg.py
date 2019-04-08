@@ -41,13 +41,15 @@ from qiskit import execute as q_execute
 from qiskit.test import QiskitTestCase
 from scipy.stats import unitary_group
 
+_EPS = 1e-10  # global variable used to chop very small numbers to zero
+
 _id = np.eye(2,2)
 _not = np.matrix([[0,1],[1,0]])
 
 class TestUCG(QiskitTestCase):
     """Qiskit UCG tests."""
     @parameterized.expand(
-        [[[_id,_id]],[[_id,1j*_id]],[[_id,_not,_id,_not]],[[unitary_group.rvs(2) for i in range(2**2)]],
+        [[[_not]],[[_id,_id]],[[_id,1j*_id]],[[_id,_not,_id,_not]],[[unitary_group.rvs(2) for i in range(2**2)]],
          [[unitary_group.rvs(2) for i in range(2**3)]],[[unitary_group.rvs(2) for i in range(2**4)]]]
     )
     def test_ucg(self, squs):
@@ -70,13 +72,14 @@ class TestUCG(QiskitTestCase):
             # It is fine if the gate is implemented up to a global phase (however, the phases between the different
             # outputs for different bases states must be correct!
             if i == 0:
-                global_phase = vec_out[0]/vec_desired[0]
+                global_phase = get_global_phase(vec_out, vec_desired)
             vec_desired = (global_phase*vec_desired).tolist()
             # Remark: We should not take the fidelity to measure the overlap over the states, since the fidelity ignores
             # the global phase (and hence the phase relation between the different columns of the unitary that the gate
             # should implement)
             dist = np.linalg.norm(np.array(vec_desired - vec_out))
             self.assertAlmostEqual(dist, 0)
+
 
 def apply_squ_to_basis_state(squs, basis_state):
     num_qubits = int(np.log2(len(squs)) + 1)
@@ -100,6 +103,12 @@ def get_binary_rep_as_list(n, num_digits):
         for c in line:
             binary.append(int(c))
     return binary
+
+
+def get_global_phase(a, b):
+    for i in range(len(b)):
+        if abs(b[i]) > _EPS:
+            return a[i]/b[i]
 
 if __name__ == '__main__':
     unittest.main()

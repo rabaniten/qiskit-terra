@@ -32,7 +32,7 @@ _EPS = 1e-10  # global variable used to chop very small numbers to zero
 class UCG(CompositeGate):  # pylint: disable=abstract-method
     """Uniformly controlled gates (also called multiplexed gates). The decomposition is based on: https://arxiv.org/pdf/quant-ph/0410066.pdf.
     gate_list = list of two qubit unitaries [U_0,...,U_{2^k-1}], where each single-qubit unitary U_i is a given as a 2*2 numpy array.
-    q_controls = list of control k qubits (at least of length one). The qubits are ordered according to their significance in the computational basis.
+    q_controls = list of control k qubits. The qubits are ordered according to their significance in the computational basis.
                     For example if q_controls=[q[2],q[1]] (with q = QuantumRegister(2)), the unitary U_0 is performed if q[2] and q[1] are in the state zero,
                     U_1 is performed if q[2] is in the state zero and q[1] is in the state one, and so on.
     q_target = target qubit, where we act on with the single-qubit gates.
@@ -68,8 +68,8 @@ class UCG(CompositeGate):  # pylint: disable=abstract-method
         """Check if the input has the correct form"""
         # Check if number of gates in gate_list is a positive power of two
         num_contr = math.log2(len(gate_list))
-        if num_contr <= 0 or not num_contr.is_integer():
-            raise QiskitError("The number of controlled single-qubit gates is not a positive power of 2.")
+        if num_contr < 0 or not num_contr.is_integer():
+            raise QiskitError("The number of controlled single-qubit gates is not a non negative power of 2.")
         # Check if number of control qubits does correspond to the number of single-qubit rotations
         if num_contr != len(q_controls):
             raise QiskitError("Number of controlled gates does not correspond to the number of control-qubits.")
@@ -93,6 +93,15 @@ class UCG(CompositeGate):  # pylint: disable=abstract-method
         """
         Call to populate the self.data list with gates that implement the uniformly controlled gate
         """
+        if len(self.q_controls) == 0:
+            if up_to_diagonal:
+                sqg = SingleQubitUnitary(self.params[0], self.q_target, up_to_diagonal=True)
+                self._attach(sqg)
+                self.diag = squ.diag
+            else:
+                sqg = SingleQubitUnitary(self.params[0], self.q_target)
+                self._attach(sqg)
+            return None
         # First, we find the single qubit gates of the decomposition.
         (single_qubit_gates, diag) = self._dec_ucg_help()
         # Now, it is easy to place the C-NOT gates and some Hadamards and Rz(pi/2) gates (which are absorbed into the
@@ -115,7 +124,6 @@ class UCG(CompositeGate):  # pylint: disable=abstract-method
                 self._attach(CnotGate(self.q_controls[q_contr_index], self.q_target))
         if up_to_diagonal:
             self.diag = diag
-            print(diag)
         else:
             # The diagonal gate is given in the basis [c_k,...,c_0,t], where c_i are the control qubits and t denotes
             # the target qubit
