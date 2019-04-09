@@ -99,13 +99,12 @@ class Isometry(CompositeGate):  # pylint: disable=abstract-method
         desired isometry to the first 2^m columns of the 2^n*2^n identity matrix (see https://arxiv.org/abs/1501.06911)
         """
 
-        # Copy the isometry (this is computationally expensive for large isometries but garantees to keep a copy
+        # Copy the isometry (this is computationally expensive for large isometries but guarantees to keep a copy
         # of the input isometry)
         remaining_isometry = self.params[0].astype(complex)  # note that "astype" does copy the isometry
         diag = []
         m = int(np.log2((self.params[0]).shape[1]))
         for column_index in range(2**m):
-            print("k=", column_index)
             # decompose the column with index column_index and attache the gate to the CompositeGate object. Return the
             # isometry which is left to decompose, where the columns up to index column_index correspond to the first
             # few columns of the identity matrix up to diag, and hence we only have to save a list containing them.
@@ -113,7 +112,6 @@ class Isometry(CompositeGate):  # pylint: disable=abstract-method
             # extract phase of the state that was sent to the basis state ket(column_index)
             diag.append(remaining_isometry[column_index, 0])
             v=remaining_isometry
-            v[np.abs(v) < 0.0000001] = 0
             remaining_isometry = remaining_isometry[:, 1:]
         # ToDo: Implement diagonal gate for one diagonal entry (do nothing)
         if len(diag) > 1:
@@ -156,7 +154,6 @@ class Isometry(CompositeGate):  # pylint: disable=abstract-method
             _apply_diagonal_gate(v, control_labels + [target_label], diag_mcg_inverse)
             # update the diag according to the applied diagonal gate
             _apply_diagonal_gate_to_diag(diag, control_labels + [target_label], diag_mcg_inverse, n)
-            v[np.abs(v) < 0.0000001] = 0
         """UCG"""
         # Find the UCG, decompose it and apply it to the remaining isometry
         single_qubit_gates = self._find_squs_for_disentangling(v, k, s)
@@ -173,7 +170,6 @@ class Isometry(CompositeGate):  # pylint: disable=abstract-method
             # # correct for the implementation "up to diagonal"
             # diag_inv = np.conj(diag).tolist()
             # _apply_diagonal_gate(v, control_labels + [target_label], diag_inv)
-            v[np.abs(v) < 0.0000001] = 0
         return diag, remaining_isometry
 
     def _find_squs_for_disentangling(self, v, k, s):
