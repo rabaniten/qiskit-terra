@@ -31,7 +31,7 @@ class DiagGate(CompositeGate):  # pylint: disable=abstract-method
     diag = list of the 2^k diagonal entries
     q = list of k qubits the diagonal is acting on (the order of the qubits specifies the computational basis in
     which the diagonal gate is provided (i,e,. the first element in diag acts on the state where all the qubits in q
-    are in the state 0, the second entry acts on the state where all the qubits q[0],...,q[k-1] are in the state zero
+    are in the state 0, the second entry acts on the state where all the qubits q[1],...,q[k-1] are in the state zero
     and q[0] is in the state 1, and so on.
     circ = QuantumCircuit or CompositeGate containing this gate
     """

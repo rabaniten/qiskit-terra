@@ -12,6 +12,7 @@ a global phase shift.
 "Quantum computation and quantum information".)
 """
 import cmath
+import math
 
 import numpy as np
 

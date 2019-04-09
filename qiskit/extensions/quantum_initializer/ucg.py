@@ -94,12 +94,12 @@ class UCG(CompositeGate):  # pylint: disable=abstract-method
         """
         if len(self.q_controls) == 0:
             if up_to_diagonal:
-                sqg = SingleQubitUnitary(self.params[0], self.q_target, up_to_diagonal=True)
-                self._attach(sqg)
+                squ = SingleQubitUnitary(self.params[0], self.q_target, up_to_diagonal=True)
+                self._attach(squ)
                 self.diag = squ.diag
             else:
-                sqg = SingleQubitUnitary(self.params[0], self.q_target)
-                self._attach(sqg)
+                squ = SingleQubitUnitary(self.params[0], self.q_target)
+                self._attach(squ)
             return None
         # First, we find the single qubit gates of the decomposition.
         (single_qubit_gates, diag) = self._dec_ucg_help()

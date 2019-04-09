@@ -86,8 +86,6 @@ class Isometry(CompositeGate):  # pylint: disable=abstract-method
         self._check_dups(qubits, message="There is an input qubit that is also listed as an ancilla qubit.")
         # call to generate the circuit that takes the desired vector to zero
         self._gates_to_uncompute()
-        # remove zero rotations and double cnots
-        self.optimize_gates()
         # invert the circuit to create the desired vector from zero (assuming
         # the qubits are in the zero state)
         self.inverse()
@@ -107,14 +105,19 @@ class Isometry(CompositeGate):  # pylint: disable=abstract-method
         diag = []
         m = int(np.log2((self.params[0]).shape[1]))
         for column_index in range(2**m):
+            print("k=", column_index)
             # decompose the column with index column_index and attache the gate to the CompositeGate object. Return the
             # isometry which is left to decompose, where the columns up to index column_index correspond to the first
             # few columns of the identity matrix up to diag, and hence we only have to save a list containing them.
             (diag, remaining_isometry) = self._decompose_column(diag, remaining_isometry, column_index)
             # extract phase of the state that was sent to the basis state ket(column_index)
             diag.append(remaining_isometry[column_index, 0])
+            v=remaining_isometry
+            v[np.abs(v) < 0.0000001] = 0
             remaining_isometry = remaining_isometry[:, 1:]
-        self._attach_mcg_up_to_diagonal(DiagGate(diag))
+        # ToDo: Implement diagonal gate for one diagonal entry (do nothing)
+        if len(diag) > 1:
+            self._attach(DiagGate(diag,self.q_input))
 
     def _decompose_column(self, diag, remaining_isometry, column_index):
         """
@@ -131,25 +134,29 @@ class Isometry(CompositeGate):  # pylint: disable=abstract-method
         (dependent on column_index)
         """
         k = column_index
+        # k_prime is the index of the column with index column_index in the remaining isometry (note that we
+        # remove columns of the isometry during the procedure)
+        k_prime = 0
         v = remaining_isometry
         n = int(np.log2(self.params[0].shape[0]))
         """MCG"""
         index1 = 2*a(k,s+1)*2**s+b(k,s+1)
         index2 = (2*a(k,s+1)+1)*2**s+b(k,s+1)
-        target_label = n - s
+        target_label = n - s - 1
         # Check if a MCG is required
-        if a(k, s) == 0 and b(k,s+1) != 0 and np.abs(v[index2, k]) > _EPS:
+        if k_s(k,s) == 0 and b(k,s+1) != 0 and np.abs(v[index2, k_prime]) > _EPS:
             # Find the MCG, decompose it and apply it to the remaining isometry
-            gate = reverse_qubit_state([v[index1,k],v[index2,k]],0)
-            control_labels = [i for i, x in enumerate(get_binary_rep_as_list(k)) if x == 1 and i != target]
+            gate = reverse_qubit_state([v[index1,k_prime],v[index2,k_prime]],0)
+            control_labels = [i for i, x in enumerate(get_binary_rep_as_list(k, n)) if x == 1 and i != target_label]
             diagonal_mcg = self._attach_mcg_up_to_diagonal(gate, control_labels, target_label)
             # apply the MCG to the remaining isometry
             _apply_multi_controlled_gate(v,control_labels,target_label,gate)
             # correct for the implementation "up to diagonal"
             diag_mcg_inverse = np.conj(diagonal_mcg).tolist()
-            _apply_diagonal_gate(v, control_labels + [target_label], diag_ucg_inverse)
+            _apply_diagonal_gate(v, control_labels + [target_label], diag_mcg_inverse)
             # update the diag according to the applied diagonal gate
-            _apply_diagonal_gate_to_diag(diag, control_labels + [target_label], diag_mcg_inverse)
+            _apply_diagonal_gate_to_diag(diag, control_labels + [target_label], diag_mcg_inverse, n)
+            v[np.abs(v) < 0.0000001] = 0
         """UCG"""
         # Find the UCG, decompose it and apply it to the remaining isometry
         single_qubit_gates = self._find_squs_for_disentangling(v, k, s)
@@ -162,41 +169,46 @@ class Isometry(CompositeGate):  # pylint: disable=abstract-method
             # apply the UCG (with the merged diagonal gate) to the remaining isometry
             _apply_uniformly_controlled_gate(v, len(control_labels), single_qubit_gates)
             # update the diag according to the applied diagonal gate
-            _apply_diagonal_gate_to_diag(diag, control_labels + [target_label], diag_ucg_inverse)
+            _apply_diagonal_gate_to_diag(diag, control_labels + [target_label], diagonal_ucg_inverse, n)
             # # correct for the implementation "up to diagonal"
             # diag_inv = np.conj(diag).tolist()
             # _apply_diagonal_gate(v, control_labels + [target_label], diag_inv)
+            v[np.abs(v) < 0.0000001] = 0
         return diag, remaining_isometry
 
     def _find_squs_for_disentangling(self, v, k, s):
+        k_prime = 0
         n = int(np.log2(self.params[0].shape[0]))
         if b(k,s+1) == 0:
             i_start = a(k,s+1)
         else:
             i_start = a(k,s+1) +1
         id_list = [np.eye(2,2) for i in range(i_start)]
-        squs = [reverse_qubit_state([v[2*l*2**s+b(k,s),k],v[(2*l+1)*2**s+b(k,s),k]], k_s(k,s)) for l in range(i_start,2**(n-s-1))]
+        squs = [reverse_qubit_state([v[2*l*2**s+b(k,s),k_prime],v[(2*l+1)*2**s+b(k,s),k_prime]], k_s(k,s)) for l in range(i_start,2**(n-s-1))]
         return id_list + squs
 
     def _attach_ucg_up_to_diagonal(self, single_qubit_gates, control_labels, target_label):
         n = int(np.log2(self.params[0].shape[0]))
         qubits = self.q_input + self.q_ancillas_for_output
-        ucg = UCG(single_qubit_gates, _get_qubits_by_label(control_labels, qubits, n),
+        # Note that we have to reverse the control labels, since controls are provided by increasing qubit number to
+        # a UCG by convention
+        ucg = UCG(single_qubit_gates, _get_qubits_by_label([i for i in reversed(control_labels)], qubits, n),
                   _get_qubits_by_label([target_label], qubits, n)[0], up_to_diagonal=True)
+        self._attach(ucg)
         return ucg.diag
 
     def _attach_mcg_up_to_diagonal(self, gate, control_labels, target_label):
-        n = np.log2(self.params[0].shape[0])
-        qubits = self.q_input + self.q_ancillas_output
+        n = int(np.log2(self.params[0].shape[0]))
+        qubits = self.q_input + self.q_ancillas_for_output
         # ToDo: Keep this threshold updated such that the lowest gate count is achieves:
         # ToDo: we implement the MCG with a UCG up to diagonal for if the number of controls is smaller than the
         # ToDo: threshold. Otherwise, the best method for MCGs up to a diagonal should be used
         threshold = float("inf")
         if n < threshold:
             # Implement the MCG as a UCG (up to diagonal)
-            gate_list = [np.eye(2,2) for i in len(control_labels)]
+            gate_list = [np.eye(2,2) for i in range(2**len(control_labels))]
             gate_list[-1] = gate
-            ucg = qiskit.extensions.quantum_initializer.ucg.UCG(gate_list, _get_qubits_by_label(control_labels, qubits, n),
+            ucg = UCG(gate_list, _get_qubits_by_label(control_labels, qubits, n),
                                                                 _get_qubits_by_label([target_label],qubits, n)[0], up_to_diagonal=True)
             self._attach(ucg)
             return ucg.diag
@@ -207,8 +219,8 @@ class Isometry(CompositeGate):  # pylint: disable=abstract-method
 
 
 def _merge_UCG_and_diag(single_qubit_gates, diag):
-    for i in len(single_qubit_gates):
-        single_qubit_gates[i] = single_qubit_gates[i].dot(np.array[[diag[2*i],0.],[0., diag[2*i+1]]])
+    for i in range(len(single_qubit_gates)):
+        single_qubit_gates[i] = np.array([[diag[2*i],0.],[0., diag[2*i+1]]]).dot(single_qubit_gates[i])
     return single_qubit_gates
 
 
@@ -230,7 +242,8 @@ def k_s(k,s):
     if k == 0:
         return 0
     else:
-        return get_binary_rep_as_list(k,int(np.log2(k)))[s]
+        num_digits = s+1
+        return get_binary_rep_as_list(k, num_digits)[0]
 
 # Input: matrix m with 2^n rows (and arbitrary many columns). Think of the columns as states on n qubits. The method
 # applies a uniformly controlled gate (UCG) to all the columns, where the UCG is specified by the inputs k and
@@ -281,11 +294,12 @@ def _apply_diagonal_gate(m, action_qubit_labels, diag):
     return m
 
 
-def _apply_diagonal_gate_to_diag(m_diagonal, action_qubit_labels, diag):
-    num_qubits_rounded = int(np.log2(len(m_diagonal))) + 1
-    basis_states = list(itertools.product([0, 1], repeat=num_qubits_rounded))
+def _apply_diagonal_gate_to_diag(m_diagonal, action_qubit_labels, diag, num_qubits):
+    if len(m_diagonal) == 0:
+        return m_diagonal
+    basis_states = list(itertools.product([0, 1], repeat=num_qubits))
     for state in basis_states[:len(m_diagonal)]:
-        state_on_action_qubits = [state[i] for i in action_qubit_labels if i <= num_qubits_rounded]
+        state_on_action_qubits = [state[i] for i in action_qubit_labels]
         diag_index = bin_to_int(state_on_action_qubits)
         i = bin_to_int(state)
         m_diagonal[i] *= diag[diag_index]
@@ -376,7 +390,7 @@ def get_binary_rep_as_list(n, num_digits):
     for line in binary_string:
         for c in line:
             binary.append(int(c))
-    return binary
+    return binary[-num_digits:]
 
 
 def is_identity(single_qubit_gates):

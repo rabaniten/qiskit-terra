@@ -32,6 +32,7 @@ Decomposition for uniformly controlled single-qubit unitaries test.
 
 import unittest
 
+
 from qiskit import QuantumCircuit
 from qiskit import QuantumRegister
 from qiskit import BasicAer
@@ -80,6 +81,7 @@ class TestUCG(QiskitTestCase):
             dist = np.linalg.norm(np.array(vec_desired - vec_out))
             self.assertAlmostEqual(dist, 0)
 
+ # ToDo: check "up to diagonal" option
 
 def apply_squ_to_basis_state(squs, basis_state):
     num_qubits = int(np.log2(len(squs)) + 1)
