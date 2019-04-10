@@ -10,9 +10,10 @@ Decompose an arbitrary 2*2 unitary into three rotation gates: U=R_zR_yR_z. Note 
 a global phase shift.
 (This is a well known decomposition, which can be found for example in Nielsen and Chuang's book
 "Quantum computation and quantum information".)
+# ToDo: Add decomposition mode XYX, which decomposes U into U=R_xR_yR_x
 """
+
 import cmath
-import math
 
 import numpy as np
 
@@ -25,46 +26,49 @@ from qiskit.extensions.standard.rz import RZGate
 _EPS = 1e-10  # global variable used to chop very small numbers to zero
 
 
-class SingleQubitUnitary(CompositeGate):  # pylint: disable=abstract-method
+class SingleQubitUnitary(CompositeGate):
     """
-    u = 2*2 unitary (given as an (complex) numpy.ndarray)
+    u = 2*2 unitary (given as a (complex) numpy.ndarray)
     q = single qubit, where the unitary is acting on
+    mode - determines the used decomposition by providing the rotation axes
+    up_to_diagonal - the single-qubit unitary is decomposed up to a diagonal matrix, i.e. a unitary u' is implemented
+                     such that there exists a 2*2 diagonal gate D with u = D.dot(u')
     circ = QuantumCircuit or CompositeGate containing this gate
     """
 
-    def __init__(self, u, q, up_to_diagonal = False, circ=None):
+    def __init__(self, u, qubit, mode="ZYZ", up_to_diagonal=False, circ=None):
+        if not mode == "ZYZ":
+            raise QiskitError("The decomposition mode is not known.")
         # Check if the matrix u has the right dimensions and if it is a unitary
-        # if not type(u) == np.ndarray:
-        #     raise QiskitError("The input matrix u is not of type numpy.ndarray.")
         if not u.shape == (2, 2):
             raise QiskitError("The dimension of the input matrix is not equal to (2,2).")
-        if not is_isometry(u, _EPS):
+        if not is_isometry(u):
             raise QiskitError("The 2*2 matrix is not unitary.")
 
         # Check if there is one qubit provided
-        if not (type(q) == tuple and type(q[0]) == QuantumRegister):
+        if not (type(qubit) == tuple and type(qubit[0]) == QuantumRegister):
             raise QiskitError("The provided qubit is not a single qubit from a QuantumRegister.")
 
         # Create new composite gate.
-        super().__init__("init", [u], [q], circ)
+        super().__init__("init", [u], [qubit], circ)
         # Decompose the single-qubit unitary (and save the elementary gate into self.data)
         self._dec_single_qubit_unitary(up_to_diagonal)
         self.diag = [1, 1]
 
-    def _dec_single_qubit_unitary(self, up_to_diagonal=False):
+    def _dec_single_qubit_unitary(self, up_to_diagonal):
         """
-        Call to populate the self.data list with gates that implement the single qubit unitary
+        Call to populate the self.data list with gates that implement the single-qubit unitary
         """
         # First, we find the rotation angles (where we can ignore the global phase)
         (a, b, c, _) = self._zyz_dec()
         # Add the gates to the composite gate
-        if (a % 4 * np.pi) > _EPS:
+        if (a % (4 * np.pi)) > _EPS:
             self._attach(RZGate(a, self.qargs[0]))
-        if (b % 4 * np.pi) > _EPS:
-            self._attach(RYGate(b,  self.qargs[0]))
-        if (c % 4 * np.pi) > _EPS:
+        if (b % (4 * np.pi)) > _EPS:
+            self._attach(RYGate(b, self.qargs[0]))
+        if (c % (4 * np.pi)) > _EPS:
             if up_to_diagonal:
-                self.diag = [np.exp(-1j*c/2.), np.exp(1j*c/2.)]
+                self.diag = [np.exp(-1j * c / 2.), np.exp(1j * c / 2.)]
             else:
                 self._attach(RZGate(c, self.qargs[0]))
 
@@ -103,13 +107,17 @@ class SingleQubitUnitary(CompositeGate):  # pylint: disable=abstract-method
         return -a, -b, -c, d
 
 
-def is_isometry(m, eps):
-    err = np.linalg.norm(np.dot(np.transpose(np.conj(m)), m) - np.eye(m.shape[1], m.shape[1]))
-    return math.isclose(err, 0, abs_tol=eps)
+def ct(m):
+    return np.transpose(np.conjugate(m))
 
 
-def zyz(self, params, qubits, up_to_diagonal=False):
-    return self._attach(SingleQubitUnitary(params, qubits, up_to_diagonal, self))
+def is_isometry(m):
+    return np.allclose(ct(m).dot(m), np.eye(m.shape[1], m.shape[1]), _EPS)
 
-QuantumCircuit.zyz = zyz
-CompositeGate.zyz = zyz
+
+def squ(self, params, qubits, mode="ZYZ", up_to_diagonal=False):
+    return self._attach(SingleQubitUnitary(params, qubits, mode, up_to_diagonal))
+
+
+QuantumCircuit.squ = squ
+CompositeGate.squ = squ
