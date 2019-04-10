@@ -36,11 +36,21 @@ class Isometry(CompositeGate):  # pylint: disable=abstract-method
     be applied to implement this meta-gate.
 
     params = an isometry from m to n qubits, i.e., a (complex) np.ndarray of dimension 2^n*2^m with orthonormal columns
-            (given in the computational basis specified by the order of the ancilla and the input qubits,
-            where the ancillas are considered to be more significant than the input qubits)
+            (given in the computational basis specified by the order of the ancillas and the input qubits,
+            where the ancillas are considered to be more significant than the input qubits.)
     q_input = list of qubits where the input to the isometry is provided on (empty list for state preparation)
-    q_ancilla = list of ancilla qubits (which are assumed to start in the zero state)
+              The qubits are listed with increasing significance.
+    q_ancilla = list of ancilla qubits (which are assumed to start in the zero state).
+                The qubits are listed with increasing significance.
     circ = QuantumCircuit or CompositeGate containing this gate
+    """
+
+    """
+    Notation: In the following decomposition we label the qubit by 
+    0 - most significant one
+    ...
+    n - least significant one
+    finally, we convert the labels back to the qubit numbering used in Qiskit (using: _get_qubits_by_label)
     """
 
     def __init__(self, isometry, q_input, q_ancillas_for_output, q_ancillas_zero=[], q_ancillas_dirty=[], circ=None):
@@ -111,11 +121,10 @@ class Isometry(CompositeGate):  # pylint: disable=abstract-method
             (diag, remaining_isometry) = self._decompose_column(diag, remaining_isometry, column_index)
             # extract phase of the state that was sent to the basis state ket(column_index)
             diag.append(remaining_isometry[column_index, 0])
-            v=remaining_isometry
             remaining_isometry = remaining_isometry[:, 1:]
         # ToDo: Implement diagonal gate for one diagonal entry (do nothing)
         if len(diag) > 1:
-            self._attach(DiagGate(diag,self.q_input))
+            self._attach(DiagGate(np.conj(diag).tolist(), self.q_input))
 
     def _decompose_column(self, diag, remaining_isometry, column_index):
         """
@@ -148,7 +157,7 @@ class Isometry(CompositeGate):  # pylint: disable=abstract-method
             control_labels = [i for i, x in enumerate(get_binary_rep_as_list(k, n)) if x == 1 and i != target_label]
             diagonal_mcg = self._attach_mcg_up_to_diagonal(gate, control_labels, target_label)
             # apply the MCG to the remaining isometry
-            _apply_multi_controlled_gate(v,control_labels,target_label,gate)
+            _apply_multi_controlled_gate(v, control_labels, target_label, gate)
             # correct for the implementation "up to diagonal"
             diag_mcg_inverse = np.conj(diagonal_mcg).tolist()
             _apply_diagonal_gate(v, control_labels + [target_label], diag_mcg_inverse)
@@ -188,7 +197,7 @@ class Isometry(CompositeGate):  # pylint: disable=abstract-method
         qubits = self.q_input + self.q_ancillas_for_output
         # Note that we have to reverse the control labels, since controls are provided by increasing qubit number to
         # a UCG by convention
-        ucg = UCG(single_qubit_gates, _get_qubits_by_label([i for i in reversed(control_labels)], qubits, n),
+        ucg = UCG(single_qubit_gates, _reverse_qubit_oder(_get_qubits_by_label(control_labels, qubits, n)),
                   _get_qubits_by_label([target_label], qubits, n)[0], up_to_diagonal=True)
         self._attach(ucg)
         return ucg.diag
@@ -204,8 +213,8 @@ class Isometry(CompositeGate):  # pylint: disable=abstract-method
             # Implement the MCG as a UCG (up to diagonal)
             gate_list = [np.eye(2,2) for i in range(2**len(control_labels))]
             gate_list[-1] = gate
-            ucg = UCG(gate_list, _get_qubits_by_label(control_labels, qubits, n),
-                                                                _get_qubits_by_label([target_label],qubits, n)[0], up_to_diagonal=True)
+            ucg = UCG(gate_list, _reverse_qubit_oder(_get_qubits_by_label(control_labels, qubits, n)),
+                      _get_qubits_by_label([target_label],qubits, n)[0], up_to_diagonal=True)
             self._attach(ucg)
             return ucg.diag
         else:
@@ -224,6 +233,10 @@ def _get_qubits_by_label(labels, qubits, num_qubits):
     # note that we label them here with decreasing significance. So we have to transform the labels to be compatible
     # with the standard convention of Qiskit (and in particular, of the state vector simulator in Qiskit aer).
     return [qubits[num_qubits-label-1] for label in labels]
+
+
+def _reverse_qubit_oder(qubits):
+    return [q for q in reversed(qubits)]
 
 
 def a(k, s):
