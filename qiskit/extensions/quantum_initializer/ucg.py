@@ -32,7 +32,7 @@ class UCG(CompositeGate):  # pylint: disable=abstract-method
     """Uniformly controlled gates (also called multiplexed gates). The decomposition is based on: https://arxiv.org/pdf/quant-ph/0410066.pdf.
     gate_list = list of two qubit unitaries [U_0,...,U_{2^k-1}], where each single-qubit unitary U_i is a given as a 2*2 numpy array.
     q_controls = list of control k qubits. The qubits are ordered according to their significance in the computational basis.
-                    For example if q_controls=[q[2],q[1]] (with q = QuantumRegister(2)), the unitary U_0 is performed if q[2] and q[1] are in the state zero,
+                    For example if q_controls=[q[1],q[2]] (with q = QuantumRegister(2)), the unitary U_0 is performed if q[1] and q[2] are in the state zero,
                     U_1 is performed if q[2] is in the state zero and q[1] is in the state one, and so on.
     q_target = target qubit, where we act on with the single-qubit gates.
     circ = QuantumCircuit or CompositeGate containing this gate
@@ -80,6 +80,9 @@ class UCG(CompositeGate):  # pylint: disable=abstract-method
         # Create new composite gate.
         num_qubits = len(q_controls) + 1
         self.num_qubits = int(num_qubits)
+        # Important: for a control list q_controls = [q_0,...,q_(k-1)] the diagonal gate is provided in the
+        # computational basis of the qubits q_(k-1),...,q_0,q_target, decreasingly ordered with respect to the
+        # significance of the qubit in the computational basis
         self.diag = np.ones(self.num_qubits)
         qubits = [q_target] + q_controls
         super().__init__("init", gate_list, qubits, circ)
