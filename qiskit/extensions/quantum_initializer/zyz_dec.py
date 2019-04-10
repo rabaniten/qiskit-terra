@@ -3,7 +3,7 @@
 # Copyright 2017, IBM.
 #
 # This source code is licensed under the Apache License, Version 2.0 found in
-# the LICENSE.txt file in the root directory of this source tree.
+# the LICENSE.txt file in the root directory of this source tree.ß
 
 """
 Decompose an arbitrary 2*2 unitary into three rotation gates: U=R_zR_yR_z. Note that the decomposition is up to
