@@ -47,7 +47,8 @@ _EPS = 1e-10  # global variable used to chop very small numbers to zero
 class TestUCG(QiskitTestCase):
     """Qiskit UCG tests."""
     @parameterized.expand(
-        [[np.eye(4,4)],[unitary_group.rvs(4)[:,0:2]],[np.eye(4,4)[:,0:2]],[unitary_group.rvs(4)]]
+        [[np.eye(4,4)],[unitary_group.rvs(4)[:,0:2]],[np.eye(4,4)[:,0:2]],[unitary_group.rvs(4)],
+         [unitary_group.rvs(8)[:,0:4]],[unitary_group.rvs(8)],[unitary_group.rvs(16)],[unitary_group.rvs(16)[:,0:8]]]
     )
     def test_isometry(self, iso):
         num_q_input = int(np.log2(iso.shape[1]))
