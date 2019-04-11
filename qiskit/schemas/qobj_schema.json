@@ -266,7 +266,6 @@
                 {
                     "properties": {
                         "memory": {
-			    "type": "array",
                             "maxItems": 0
                         },
                         "name": {
@@ -283,7 +282,6 @@
                             "maxItems": 1
                         },
                         "register": {
-			    "type": "array",
                             "maxItems": 0
                         },
                         "texparams": {
@@ -300,7 +298,6 @@
                 {
                     "properties": {
                         "memory": {
-			    "type": "array",
                             "maxItems": 0
                         },
                         "name": {
@@ -325,7 +322,6 @@
                             "minItems": 1
                         },
                         "register": {
-			    "type": "array",
                             "maxItems": 0
                         },
                         "texparams": {
@@ -340,7 +336,6 @@
                 {
                     "properties": {
                         "memory": {
-			    "type": "array",
                             "maxItems": 0
                         },
                         "name": {
@@ -361,7 +356,6 @@
                             "minItems": 1
                         },
                         "register": {
-			    "type": "array",
                             "maxItems": 0
                         },
                         "texparams": {
@@ -378,7 +372,6 @@
                 {
                     "properties": {
                         "memory": {
-			    "type": "array",
                             "maxItems": 0
                         },
                         "name": {
@@ -395,7 +388,6 @@
                             "minItems": 1
                         },
                         "register": {
-			    "type": "array",
                             "maxItems": 0
                         },
                         "texparams": {
@@ -412,7 +404,6 @@
                 {
                     "properties": {
                         "memory": {
-			    "type": "array",
                             "maxItems": 0
                         },
                         "name": {
@@ -434,7 +425,6 @@
                             "minItems": 2
                         },
                         "register": {
-			    "type": "array",
                             "maxItems": 0
                         },
                         "texparams": {
@@ -449,7 +439,6 @@
                 {
                     "properties": {
                         "memory": {
-			    "type": "array",
                             "maxItems": 0
                         },
                         "name": {
@@ -469,7 +458,6 @@
                             "minItems": 2
                         },
                         "register": {
-			    "type": "array",
                             "maxItems": 0
                         },
                         "texparams": {
@@ -486,7 +474,6 @@
                 {
                     "properties": {
                         "memory": {
-			    "type": "array",
                             "maxItems": 0
                         },
                         "name": {
@@ -504,7 +491,6 @@
                             "minItems": 2
                         },
                         "register": {
-			    "type": "array",
                             "maxItems": 0
                         },
                         "texparams": {
@@ -521,7 +507,6 @@
                 {
                     "properties": {
                         "memory": {
-			    "type": "array",
                             "maxItems": 0
                         },
                         "name": {
@@ -539,7 +524,6 @@
                             "minItems": 3
                         },
                         "register": {
-			    "type": "array",
                             "maxItems": 0
                         },
                         "texparams": {
@@ -554,7 +538,6 @@
                 {
                     "properties": {
                         "memory": {
-			    "type": "array",
                             "minItems": 1
                         },
                         "name": {
@@ -569,7 +552,6 @@
                             "minItems": 1
                         },
                         "register": {
-			    "type": "array",
                             "minItems": 1
                         },
                         "texparams": {
@@ -585,7 +567,6 @@
                 {
                     "properties": {
                         "memory": {
-			    "type": "array",
                             "maxItems": 0
                         },
                         "name": {
@@ -600,7 +581,6 @@
                             "minItems": 1
                         },
                         "register": {
-			    "type": "array",
                             "maxItems": 0
                         },
                         "texparams": {
@@ -618,7 +598,6 @@
                             "type": "string"
                         },
                         "memory": {
-			    "type": "array",
                             "maxItems": 0
                         },
                         "name": {
@@ -627,7 +606,6 @@
                             ]
                         },
                         "register": {
-			    "type": "array",
                             "maxItems": 0
                         },
                         "texparams": {
@@ -663,6 +641,9 @@
                     ]
 
                 },
+                "memory": {
+                    "type": "array"
+                },
                 "name": {
                     "type": "string"
                 },
@@ -670,6 +651,9 @@
                     "type": "array"
                 },
                 "qubits": {
+                    "type": "array"
+                },
+                "register": {
                     "type": "array"
                 }
             },
@@ -856,6 +840,7 @@
                 },
                 "instructions": {
                     "description": "List of experiment instructions.",
+                    "minItems": 1,
                     "type": "array"
                 }
             },

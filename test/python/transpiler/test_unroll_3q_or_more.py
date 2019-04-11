@@ -27,10 +27,11 @@ class TestUnroll3qOrMore(QiskitTestCase):
         dag = circuit_to_dag(circuit)
         pass_ = Unroll3qOrMore()
         after_dag = pass_.run(dag)
-        op_nodes = after_dag.op_nodes()
+        op_nodes = after_dag.op_nodes(data=True)
         self.assertEqual(len(op_nodes), 15)
         for node in op_nodes:
-            self.assertIn(node.name, ['h', 't', 'tdg', 'cx'])
+            op = node[1]["op"]
+            self.assertIn(op.name, ['h', 't', 'tdg', 'cx'])
 
     def test_cswap(self):
         """Test decompose CSwap (recursively).
@@ -42,10 +43,11 @@ class TestUnroll3qOrMore(QiskitTestCase):
         dag = circuit_to_dag(circuit)
         pass_ = Unroll3qOrMore()
         after_dag = pass_.run(dag)
-        op_nodes = after_dag.op_nodes()
+        op_nodes = after_dag.op_nodes(data=True)
         self.assertEqual(len(op_nodes), 17)
         for node in op_nodes:
-            self.assertIn(node.name, ['h', 't', 'tdg', 'cx'])
+            op = node[1]["op"]
+            self.assertIn(op.name, ['h', 't', 'tdg', 'cx'])
 
     def test_decompose_conditional(self):
         """Test decompose a 3-qubit gate with a conditional.
@@ -57,8 +59,9 @@ class TestUnroll3qOrMore(QiskitTestCase):
         dag = circuit_to_dag(circuit)
         pass_ = Unroll3qOrMore()
         after_dag = pass_.run(dag)
-        op_nodes = after_dag.op_nodes()
+        op_nodes = after_dag.op_nodes(data=True)
         self.assertEqual(len(op_nodes), 15)
         for node in op_nodes:
-            self.assertIn(node.name, ['h', 't', 'tdg', 'cx'])
-            self.assertEqual(node.condition, (cr, 0))
+            op = node[1]["op"]
+            self.assertIn(op.name, ['h', 't', 'tdg', 'cx'])
+            self.assertEqual(node[1]['condition'], (cr, 0))

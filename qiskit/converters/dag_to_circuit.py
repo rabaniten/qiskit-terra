@@ -6,7 +6,6 @@
 # the LICENSE.txt file in the root directory of this source tree.
 
 """Helper function for converting a dag to a circuit"""
-import copy
 import collections
 
 from qiskit.circuit import QuantumCircuit
@@ -35,24 +34,36 @@ def dag_to_circuit(dag):
     name = dag.name or None
     circuit = QuantumCircuit(*qregs.values(), *cregs.values(), name=name)
 
-    for node in dag.nodes_in_topological_order():
-        if node.type == 'op':
+    for node in dag.node_nums_in_topological_order():
+        n = dag.node(node)
+        if n['type'] == 'op':
             qubits = []
-            for qubit in node.qargs:
+            for qubit in n['qargs']:
                 qubits.append(qregs[qubit[0].name][qubit[1]])
 
             clbits = []
-            for clbit in node.cargs:
+            for clbit in n['cargs']:
                 clbits.append(cregs[clbit[0].name][clbit[1]])
 
             # Get arguments for classical control (if any)
-            if node.condition is None:
+            if n['condition'] is None:
                 control = None
             else:
-                control = (node.condition[0], node.condition[1])
+                control = (n['condition'][0], n['condition'][1])
 
-            inst = copy.deepcopy(node.op)
+            def duplicate_instruction(inst):
+                """Create a fresh instruction from an input instruction."""
+                if inst.name == 'barrier':
+                    params = [inst.qargs]
+                elif inst.name == 'snapshot':
+                    params = inst.params + [inst.qargs]
+                else:
+                    params = inst.params + inst.qargs + inst.cargs
+                new_inst = inst.__class__(*params)
+                return new_inst
+
+            inst = duplicate_instruction(n['op'])
             inst.control = control
-            circuit.append(inst, qubits, clbits)
+            circuit._attach(inst)
 
     return circuit

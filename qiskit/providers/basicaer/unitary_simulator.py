@@ -26,15 +26,15 @@ import uuid
 import time
 from math import log2, sqrt
 import numpy as np
-from qiskit.util import local_hardware_info
+from qiskit._util import local_hardware_info
 from qiskit.providers.models import BackendConfiguration
 from qiskit.providers import BaseBackend
 from qiskit.providers.basicaer.basicaerjob import BasicAerJob
 from qiskit.result import Result
 from .exceptions import BasicAerError
-from .basicaertools import single_gate_matrix
-from .basicaertools import cx_gate_matrix
-from .basicaertools import einsum_matmul_index
+from ._basicaertools import single_gate_matrix
+from ._basicaertools import cx_gate_matrix
+from ._basicaertools import einsum_matmul_index
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +59,6 @@ class UnitarySimulatorPy(BaseBackend):
         'open_pulse': False,
         'memory': False,
         'max_shots': 65536,
-        'coupling_map': None,
         'description': 'A python simulator for unitary matrix corresponding to a circuit',
         'basis_gates': ['u1', 'u2', 'u3', 'cx', 'id'],
         'gates': [

@@ -15,35 +15,41 @@ from qiskit.circuit import Gate
 from qiskit.circuit import QuantumCircuit
 from qiskit.circuit import QuantumRegister
 from qiskit.circuit.decorators import _op_expand
-from qiskit.extensions.standard.u3 import U3Gate
+from qiskit.dagcircuit import DAGCircuit
+from qiskit.extensions.standard.ubase import UBase
 
 
 class IdGate(Gate):
     """Identity gate."""
 
-    def __init__(self):
+    def __init__(self, qubit, circ=None):
         """Create new Identity gate."""
-        super().__init__("id", 1, [])
+        super().__init__("id", [], [qubit], circ)
 
-    def _define(self):
-        definition = []
+    def _define_decompositions(self):
+        decomposition = DAGCircuit()
         q = QuantumRegister(1, "q")
+        decomposition.add_qreg(q)
         rule = [
-            (U3Gate(0, 0, 0), [q[0]], [])
+            UBase(0, 0, 0, q[0])
         ]
         for inst in rule:
-            definition.append(inst)
-        self.definition = definition
+            decomposition.apply_operation_back(inst)
+        self._decompositions = [decomposition]
 
     def inverse(self):
         """Invert this gate."""
-        return IdGate()  # self-inverse
+        return self  # self-inverse
+
+    def reapply(self, circ):
+        """Reapply this gate to corresponding qubits in circ."""
+        self._modifiers(circ.iden(self.qargs[0]))
 
 
 @_op_expand(1)
 def iden(self, q):
     """Apply Identity to q."""
-    return self.append(IdGate(), [q], [])
+    return self._attach(IdGate(q, self))
 
 
 QuantumCircuit.iden = iden

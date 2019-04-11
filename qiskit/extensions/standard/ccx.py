@@ -13,6 +13,7 @@ from qiskit.circuit import Gate
 from qiskit.circuit import QuantumCircuit
 from qiskit.circuit import QuantumRegister
 from qiskit.circuit.decorators import _op_expand
+from qiskit.dagcircuit import DAGCircuit
 from qiskit.extensions.standard.h import HGate
 from qiskit.extensions.standard.cx import CnotGate
 from qiskit.extensions.standard.t import TGate
@@ -22,11 +23,11 @@ from qiskit.extensions.standard.t import TdgGate
 class ToffoliGate(Gate):
     """Toffoli gate."""
 
-    def __init__(self):
+    def __init__(self, ctl1, ctl2, tgt, circ=None):
         """Create new Toffoli gate."""
-        super().__init__("ccx", 3, [])
+        super().__init__("ccx", [], [ctl1, ctl2, tgt], circ)
 
-    def _define(self):
+    def _define_decompositions(self):
         """
         gate ccx a,b,c
         {
@@ -35,38 +36,43 @@ class ToffoliGate(Gate):
         t b; t c; h c; cx a,b;
         t a; tdg b; cx a,b;}
         """
-        definition = []
+        decomposition = DAGCircuit()
         q = QuantumRegister(3, "q")
+        decomposition.add_qreg(q)
         rule = [
-            (HGate(), [q[2]], []),
-            (CnotGate(), [q[1], q[2]], []),
-            (TdgGate(), [q[2]], []),
-            (CnotGate(), [q[0], q[2]], []),
-            (TGate(), [q[2]], []),
-            (CnotGate(), [q[1], q[2]], []),
-            (TdgGate(), [q[2]], []),
-            (CnotGate(), [q[0], q[2]], []),
-            (TGate(), [q[1]], []),
-            (TGate(), [q[2]], []),
-            (HGate(), [q[2]], []),
-            (CnotGate(), [q[0], q[1]], []),
-            (TGate(), [q[0]], []),
-            (TdgGate(), [q[1]], []),
-            (CnotGate(), [q[0], q[1]], [])
+            HGate(q[2]),
+            CnotGate(q[1], q[2]),
+            TdgGate(q[2]),
+            CnotGate(q[0], q[2]),
+            TGate(q[2]),
+            CnotGate(q[1], q[2]),
+            TdgGate(q[2]),
+            CnotGate(q[0], q[2]),
+            TGate(q[1]),
+            TGate(q[2]),
+            HGate(q[2]),
+            CnotGate(q[0], q[1]),
+            TGate(q[0]),
+            TdgGate(q[1]),
+            CnotGate(q[0], q[1])
         ]
         for inst in rule:
-            definition.append(inst)
-        self.definition = definition
+            decomposition.apply_operation_back(inst)
+        self._decompositions = [decomposition]
 
     def inverse(self):
         """Invert this gate."""
-        return ToffoliGate()  # self-inverse
+        return self  # self-inverse
+
+    def reapply(self, circ):
+        """Reapply this gate to corresponding qubits in circ."""
+        self._modifiers(circ.ccx(self.qargs[0], self.qargs[1], self.qargs[2]))
 
 
 @_op_expand(3, broadcastable=[True, True, False])
 def ccx(self, ctl1, ctl2, tgt):
     """Apply Toffoli to from ctl1 and ctl2 to tgt."""
-    return self.append(ToffoliGate(), [ctl1, ctl2, tgt], [])
+    return self._attach(ToffoliGate(ctl1, ctl2, tgt, self))
 
 
 QuantumCircuit.ccx = ccx

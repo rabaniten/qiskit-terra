@@ -24,6 +24,7 @@
             "properties": {
                 "instructions": {
                     "description": "List of experiment instructions.",
+                    "minItems": 1,
                     "type": "array"
                 }
             },

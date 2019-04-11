@@ -9,13 +9,10 @@
 Snapshot.
 """
 
-from qiskit.pulse.channels import SnapshotChannel
-from qiskit.pulse.common.interfaces import Instruction
-from qiskit.pulse.common.timeslots import TimeslotOccupancy
-from .pulse_command import PulseCommand
+from qiskit.pulse.commands.pulse_command import PulseCommand
 
 
-class Snapshot(PulseCommand, Instruction):
+class Snapshot(PulseCommand):
     """Snapshot."""
 
     def __init__(self, label, snap_type):
@@ -27,11 +24,11 @@ class Snapshot(PulseCommand, Instruction):
                 The types of snapshots offered are defined in a separate specification
                 document for simulators.
         """
-        super().__init__(duration=0)
+
+        super(Snapshot, self).__init__(duration=0, name='snapshot')
+
         self.label = label
         self.type = snap_type
-        self._channel = SnapshotChannel()
-        self._occupancy = TimeslotOccupancy([])
 
     def __eq__(self, other):
         """Two Snapshots are the same if they are of the same type
@@ -44,28 +41,7 @@ class Snapshot(PulseCommand, Instruction):
             bool: are self and other equal.
         """
         if type(self) is type(other) and \
-                self.label == other.label and \
+                self.label == other.label and\
                 self.type == other.type:
             return True
         return False
-
-    @property
-    def duration(self):
-        return 0
-
-    @property
-    def occupancy(self):
-        return self._occupancy
-
-    @property
-    def command(self) -> 'Snapshot':
-        """Snapshot command. """
-        return self
-
-    @property
-    def channel(self) -> SnapshotChannel:
-        """Snapshot channel. """
-        return self._channel
-
-    def __repr__(self):
-        return '%s(%s, %s) >> %s' % (self.__class__.__name__, self.label, self.type, self._channel)

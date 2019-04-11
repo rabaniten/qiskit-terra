@@ -29,10 +29,8 @@ class CXCancellation(TransformationPass):
             chunk = []
             for i in range(len(cx_run) - 1):
                 chunk.append(cx_run[i])
-
-                qargs0 = cx_run[i].qargs
-                qargs1 = cx_run[i + 1].qargs
-
+                qargs0 = dag.node(cx_run[i])["qargs"]
+                qargs1 = dag.node(cx_run[i + 1])["qargs"]
                 if qargs0 != qargs1:
                     partition.append(chunk)
                     chunk = []
@@ -42,8 +40,8 @@ class CXCancellation(TransformationPass):
             for chunk in partition:
                 if len(chunk) % 2 == 0:
                     for n in chunk:
-                        dag.remove_op_node(n)
+                        dag._remove_op_node(n)
                 else:
                     for n in chunk[1:]:
-                        dag.remove_op_node(n)
+                        dag._remove_op_node(n)
         return dag

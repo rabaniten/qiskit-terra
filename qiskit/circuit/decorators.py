@@ -14,8 +14,6 @@ import functools
 from qiskit.exceptions import QiskitError
 from .instructionset import InstructionSet
 from .register import Register
-from .quantumregister import QuantumRegister
-from .classicalregister import ClassicalRegister
 
 
 def _is_bit(obj):
@@ -79,9 +77,7 @@ def _op_expand(n_bits, func=None, broadcastable=None):
                 if all(rargs):
                     instructions = InstructionSet()
                     for irargs in zip(*rargs):
-                        instructions.add(func(self, *params, *irargs),
-                                         [i for i in irargs if isinstance(i[0], QuantumRegister)],
-                                         [i for i in irargs if isinstance(i[0], ClassicalRegister)])
+                        instructions.add(func(self, *params, *irargs))
                     return instructions
                 else:
                     raise QiskitError('empty control or target argument')

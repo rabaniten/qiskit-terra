@@ -22,13 +22,14 @@ import logging
 from concurrent import futures
 import time
 
+from qiskit.qobj.utils import QobjType
 from qiskit.result import Result
 from qiskit.providers import BaseBackend, BaseJob
 from qiskit.providers.models import BackendProperties, BackendConfiguration
 from qiskit.providers.models.backendconfiguration import GateConfig
-from qiskit.qobj import (QasmQobj, QobjExperimentHeader, QobjHeader,
-                         QasmQobjInstruction, QasmQobjExperimentConfig,
-                         QasmQobjExperiment, QasmQobjConfig)
+from qiskit.qobj import (Qobj, QobjConfig, QobjHeader, QobjInstruction,
+                         QobjExperiment, QobjExperimentHeader,
+                         QobjExperimentConfig)
 from qiskit.providers.jobstatus import JobStatus
 from qiskit.providers.baseprovider import BaseProvider
 from qiskit.providers.exceptions import QiskitBackendNotFoundError
@@ -347,15 +348,16 @@ class FakeJob(BaseJob):
 def new_fake_qobj():
     """Create fake `Qobj` and backend instances."""
     backend = FakeQasmSimulator()
-    return QasmQobj(
+    return Qobj(
         qobj_id='test-id',
-        config=QasmQobjConfig(shots=1024, memory_slots=1, max_credits=100),
+        config=QobjConfig(shots=1024, memory_slots=1, max_credits=100),
         header=QobjHeader(backend_name=backend.name()),
-        experiments=[QasmQobjExperiment(
+        experiments=[QobjExperiment(
             instructions=[
-                QasmQobjInstruction(name='barrier', qubits=[1])
+                QobjInstruction(name='barrier', qubits=[1])
             ],
             header=QobjExperimentHeader(),
-            config=QasmQobjExperimentConfig(seed=123456)
-        )]
+            config=QobjExperimentConfig(seed=123456)
+        )],
+        type=QobjType.QASM.value
     )

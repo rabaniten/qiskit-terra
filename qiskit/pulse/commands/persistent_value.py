@@ -9,11 +9,8 @@
 Persistent value.
 """
 
-from qiskit.pulse.channels import OutputChannel
-from qiskit.pulse.common.interfaces import Instruction
-from qiskit.pulse.common.timeslots import Interval, Timeslot, TimeslotOccupancy
-from qiskit.pulse.exceptions import PulseError
-from .pulse_command import PulseCommand
+from qiskit.exceptions import QiskitError
+from qiskit.pulse.commands.pulse_command import PulseCommand
 
 
 class PersistentValue(PulseCommand):
@@ -26,12 +23,13 @@ class PersistentValue(PulseCommand):
             value (complex): Complex value to apply, bounded by an absolute value of 1.
                 The allowable precision is device specific.
         Raises:
-            PulseError: when input value exceed 1.
+            QiskitError: when input value exceed 1.
         """
-        super().__init__(duration=0)
+
+        super(PersistentValue, self).__init__(duration=0, name='pv')
 
         if abs(value) > 1:
-            raise PulseError("Absolute value of PV amplitude exceeds 1.")
+            raise QiskitError("Absolute value of PV amplitude exceeds 1.")
 
         self.value = value
 
@@ -49,39 +47,3 @@ class PersistentValue(PulseCommand):
                 self.value == other.value:
             return True
         return False
-
-    def __repr__(self):
-        return '%s(%s, value=%s)' % (self.__class__.__name__, self.name, self.value)
-
-    def __call__(self, channel: OutputChannel) -> 'PersistentValueInstruction':
-        return PersistentValueInstruction(self, channel)
-
-
-class PersistentValueInstruction(Instruction):
-    """Pulse to keep persistent value. """
-
-    def __init__(self, command: PersistentValue, channel: OutputChannel):
-        self._command = command
-        self._channel = channel
-        self._occupancy = TimeslotOccupancy([Timeslot(Interval(0, 0), channel)])
-
-    @property
-    def duration(self):
-        return 0
-
-    @property
-    def occupancy(self):
-        return self._occupancy
-
-    @property
-    def command(self) -> PersistentValue:
-        """PersistentValue command."""
-        return self._command
-
-    @property
-    def channel(self) -> OutputChannel:
-        """OutputChannel channel."""
-        return self._channel
-
-    def __repr__(self):
-        return '%s >> %s' % (self._command, self._channel)

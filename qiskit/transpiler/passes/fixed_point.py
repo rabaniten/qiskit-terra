@@ -5,16 +5,15 @@
 # This source code is licensed under the Apache License, Version 2.0 found in
 # the LICENSE.txt file in the root directory of this source tree.
 
-""" The FixedPoint pass detects fixed points in properties.
+""" TODO
 """
-from copy import deepcopy
-
+from collections import defaultdict
 from qiskit.transpiler.basepasses import AnalysisPass
 
 
 class FixedPoint(AnalysisPass):
     """ A dummy analysis pass that checks if a property reached a fixed point. The results is saved
-        in property_set['<property>_fixed_point'] as a boolean.
+        in property_set['fixed_point'][<property>] as a boolean.
     """
 
     def __init__(self, property_to_check):
@@ -24,15 +23,15 @@ class FixedPoint(AnalysisPass):
         """
         super().__init__()
         self._property = property_to_check
+        self._previous_value = None
 
     def run(self, dag):
+        if self.property_set['fixed_point'] is None:
+            self.property_set['fixed_point'] = defaultdict(lambda: False)
+
         current_value = self.property_set[self._property]
-        fixed_point_previous_property = '_fixed_point_previous_%s' % self._property
 
-        if self.property_set[fixed_point_previous_property] is None:
-            self.property_set['%s_fixed_point' % self._property] = False
-        else:
-            fixed_point_reached = self.property_set[fixed_point_previous_property] == current_value
-            self.property_set['%s_fixed_point' % self._property] = fixed_point_reached
+        if self._previous_value is not None:
+            self.property_set['fixed_point'][self._property] = self._previous_value == current_value
 
-        self.property_set[fixed_point_previous_property] = deepcopy(current_value)
+        self._previous_value = current_value

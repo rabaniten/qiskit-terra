@@ -6,6 +6,5 @@
 # the LICENSE.txt file in the root directory of this source tree.
 
 """Module for DAG Circuits."""
-from .dagcircuit import DAGCircuit
-from .dagnode import DAGNode
+from ._dagcircuit import DAGCircuit
 from .exceptions import DAGCircuitError
