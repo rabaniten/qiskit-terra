@@ -13,23 +13,25 @@ ZYZ decomposition for single-qubit unitary (CompositeGate instance) test.
 
 import unittest
 
-from qiskit import QuantumCircuit
-from qiskit import QuantumRegister
-from qiskit import BasicAer
-from qiskit import execute as q_execute
-from qiskit.test import QiskitTestCase
 import numpy as np
 from parameterized import parameterized
 from scipy.stats import unitary_group
+
+from qiskit import BasicAer
+from qiskit import QuantumCircuit
+from qiskit import QuantumRegister
+from qiskit import execute as q_execute
+from qiskit.test import QiskitTestCase
+from qiskit.extensions.quantum_initializer.squ import SingleQubitUnitary
 
 
 class TestSingleQubitUnitary(QiskitTestCase):
     """Qiskit ZYZ-decomposition tests."""
     @parameterized.expand(
-    [[np.eye(2, 2)], [np.array([[0., 1.], [1., 0.]])], [1/np.sqrt(2)*np.array([[1., 1.], [-1., 1.]])],
-     [np.array([[np.exp(1j * 5. / 2), 0], [0, np.exp(-1j * 5./ 2)]])], [unitary_group.rvs(2)]]
+        [[np.eye(2, 2)], [np.array([[0., 1.], [1., 0.]])], [1 / np.sqrt(2) * np.array([[1., 1.], [-1., 1.]])],
+         [np.array([[np.exp(1j * 5. / 2), 0], [0, np.exp(-1j * 5. / 2)]])], [unitary_group.rvs(2)]]
     )
-    def test_squ(self,u):
+    def test_squ(self, u):
         q = QuantumRegister(1)
         # test the squ for all possible basis states.
         for i in range(2):
@@ -57,9 +59,38 @@ class TestSingleQubitUnitary(QiskitTestCase):
             self.assertGreater(_EPS, dist)
 
 
+class TestSingleQubitUnitaryUpToDiagonal(QiskitTestCase):
+    """Qiskit ZYZ-decomposition tests up to diagonal gates."""
+    @parameterized.expand(
+        [[np.eye(2, 2)], [np.array([[0., 1.], [1., 0.]])], [1 / np.sqrt(2) * np.array([[1., 1.], [-1., 1.]])],
+         [np.array([[np.exp(1j * 5. / 2), 0], [0, np.exp(-1j * 5. / 2)]])], [unitary_group.rvs(2)]]
+    )
+    def test_squ(self, u):
+        q = QuantumRegister(1)
+        # test the squ for all possible basis states.
+        for i in range(2):
+            qc = _prepare_basis_state(q, i)
+            # ToDo: Remove this work around after the state vector simulator is fixed (it can't simulate the empty
+            # ToDo: circuit at the moment)
+            qc.x(q[0])
+            qc.x(q[0])
+            sqg = SingleQubitUnitary(u, q[0], up_to_diagonal=True)
+            qc._attach(sqg)
+            # ToDo: improve efficiency here by allowing to execute circuit on several states in parallel (this would
+            # ToDo: in particular allow to get out the isometry the circuit is implementing by applying it to the first
+            # ToDo: few basis vectors
+            vec_out = np.asarray(q_execute(qc, BasicAer.get_backend(
+                'statevector_simulator')).result().get_statevector(qc, decimals=16))
+            vec_out = np.array(sqg.diag)*vec_out
+            vec_desired = _apply_squ_to_basis_state(u, i)
+            if i == 0:
+                global_phase = _get_global_phase(vec_out, vec_desired)
+            vec_desired = (global_phase * vec_desired).tolist()
+            dist = np.linalg.norm(np.array(vec_desired - vec_out))
+            self.assertGreater(_EPS, dist)
 
 
-def  _prepare_basis_state(q, i):
+def _prepare_basis_state(q, i):
     qc = QuantumCircuit(q)
     binary_rep = _get_binary_rep_as_list(i, 1)
     for j in range(len(binary_rep)):
@@ -67,13 +98,16 @@ def  _prepare_basis_state(q, i):
             qc.x(q[- (j + 1)])
     return qc
 
+
 def _apply_squ_to_basis_state(squ, basis_state):
-    return squ[:,basis_state]
+    return squ[:, basis_state]
+
 
 def _get_global_phase(a, b):
     for i in range(len(b)):
         if abs(b[i]) > _EPS:
             return a[i] / b[i]
+
 
 def _get_binary_rep_as_list(n, num_digits):
     binary_string = np.binary_repr(n).zfill(num_digits)
@@ -82,9 +116,6 @@ def _get_binary_rep_as_list(n, num_digits):
         for c in line:
             binary.append(int(c))
     return binary
-
-
-
 
 
 if __name__ == '__main__':
