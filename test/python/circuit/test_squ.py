@@ -5,6 +5,8 @@
 # This source code is licensed under the Apache License, Version 2.0 found in
 # the LICENSE.txt file in the root directory of this source tree.
 
+_EPS = 1e-10  # global variable used to chop very small numbers to zero
+
 """
 ZYZ decomposition for single-qubit unitary (CompositeGate instance) test.
 """
@@ -13,104 +15,76 @@ import unittest
 
 from qiskit import QuantumCircuit
 from qiskit import QuantumRegister
-from qiskit import execute, BasicAer
-from qiskit.quantum_info import state_fidelity
+from qiskit import BasicAer
+from qiskit import execute as q_execute
 from qiskit.test import QiskitTestCase
 import numpy as np
+from parameterized import parameterized
 from scipy.stats import unitary_group
-from qiskit.extensions.quantum_initializer.squ import SingleQubitUnitary
 
 
 class TestSingleQubitUnitary(QiskitTestCase):
     """Qiskit ZYZ-decomposition tests."""
-
-    _desired_fidelity = 1-1e-8
-
-    def test_identity(self):
-        fidelity = _get_fidelity_zyz_dec(np.eye(2, 2))
-        self.assertGreater(
-            fidelity, self._desired_fidelity,
-            "Initializer has low fidelity {0:.2g}.".format(fidelity))
-
-    def test_NOT(self):
-        fidelity = _get_fidelity_zyz_dec(np.array([[0., 1.], [1., 0.]]))
-        self.assertGreater(
-            fidelity, self._desired_fidelity,
-            "Initializer has low fidelity {0:.2g}.".format(fidelity))
-
-    def test_Hadamard(self):
-        fidelity = _get_fidelity_zyz_dec(1/np.sqrt(2)*np.array([[1., 1.], [-1., 1.]]))
-        self.assertGreater(
-            fidelity, self._desired_fidelity,
-            "Initializer has low fidelity {0:.2g}.".format(fidelity))
-
-    def test_Rz(self):
-        fidelity = _get_fidelity_zyz_dec(_rz(8))
-        self.assertGreater(
-            fidelity, self._desired_fidelity,
-            "Initializer has low fidelity {0:.2g}.".format(fidelity))
-
-    def test_Rz_up_to_diagonal(self):
-        fidelity = _get_fidelity_zyz_dec(_rz(8), up_to_diagonal=True)
-        self.assertGreater(
-            fidelity, self._desired_fidelity,
-            "Initializer has low fidelity {0:.2g}.".format(fidelity))
-
-    def test_random(self):
-        u = unitary_group.rvs(2)
-        fidelity = _get_fidelity_zyz_dec(u)
-        print(fidelity)
-        self.assertGreater(
-            fidelity, self._desired_fidelity,
-            "Initializer has low fidelity {0:.2g}.".format(fidelity))
-
-    def test_random_up_to_diagonal(self):
-        u = unitary_group.rvs(2)
-        fidelity = _get_fidelity_zyz_dec(u, up_to_diagonal=True)
-        print(fidelity)
-        self.assertGreater(
-            fidelity, self._desired_fidelity,
-            "Initializer has low fidelity {0:.2g}.".format(fidelity))
+    @parameterized.expand(
+    [[np.eye(2, 2)], [np.array([[0., 1.], [1., 0.]])], [1/np.sqrt(2)*np.array([[1., 1.], [-1., 1.]])],
+     [np.array([[np.exp(1j * 5. / 2), 0], [0, np.exp(-1j * 5./ 2)]])], [unitary_group.rvs(2)]]
+    )
+    def test_squ(self,u):
+        q = QuantumRegister(1)
+        # test the squ for all possible basis states.
+        for i in range(2):
+            qc = _prepare_basis_state(q, i)
+            # ToDo: Remove this work around after the state vector simulator is fixed (it can't simulate the empty
+            # ToDo: circuit at the moment)
+            qc.x(q[0])
+            qc.x(q[0])
+            qc.squ(u, q[0])
+            # ToDo: improve efficiency here by allowing to execute circuit on several states in parallel (this would
+            # ToDo: in particular allow to get out the isometry the circuit is implementing by applying it to the first
+            # ToDo: few basis vectors
+            vec_out = np.asarray(q_execute(qc, BasicAer.get_backend(
+                'statevector_simulator')).result().get_statevector(qc, decimals=16))
+            vec_desired = _apply_squ_to_basis_state(u, i)
+            # It is fine if the gate is implemented up to a global phase (however, the phases between the different
+            # outputs for different bases states must be correct!
+            if i == 0:
+                global_phase = _get_global_phase(vec_out, vec_desired)
+            vec_desired = (global_phase * vec_desired).tolist()
+            # Remark: We should not take the fidelity to measure the overlap over the states, since the fidelity ignores
+            # the global phase (and hence the phase relation between the different columns of the unitary that the gate
+            # should implement)
+            dist = np.linalg.norm(np.array(vec_desired - vec_out))
+            self.assertGreater(_EPS, dist)
 
 
-def _get_fidelity_zyz_dec(u, up_to_diagonal=False):
-    qr = QuantumRegister(2, "qr")
-    qc = QuantumCircuit(qr)
-    # To test a unitary, we apply it to the maximally entangled state. This lead to the Choi state of the unitary,
-    # which we then compare to the Choi state of the desired unitary by taking the fidelity (which bounds the
-    # diamond norm between the two unitaries (up to a constant factor))
-    desired_vector = _choi_state(u)
-    _create_maximally_entangled_state(qr, qc)
-    qc.squ(u, qr[0])
-    job = execute(qc, BasicAer.get_backend('statevector_simulator'))
-    result = job.result()
-    state_vector = result.get_statevector()
-    if up_to_diagonal:
-        squ = SingleQubitUnitary(u, qr[0], up_to_diagonal=True)
-        state_vector[0] *= squ.diag[0]
-        state_vector[1] *= squ.diag[1]
-        fidelity = state_fidelity(state_vector, desired_vector)
-    else:
-        fidelity = state_fidelity(state_vector, desired_vector)
-    return fidelity
 
 
-def _rz(alpha):
-    return np.array([[np.exp(1j*alpha/2), 0], [0, np.exp(-1j*alpha/2)]])
+def  _prepare_basis_state(q, i):
+    qc = QuantumCircuit(q)
+    binary_rep = _get_binary_rep_as_list(i, 1)
+    for j in range(len(binary_rep)):
+        if binary_rep[j] == 1:
+            qc.x(q[- (j + 1)])
+    return qc
+
+def _apply_squ_to_basis_state(squ, basis_state):
+    return squ[:,basis_state]
+
+def _get_global_phase(a, b):
+    for i in range(len(b)):
+        if abs(b[i]) > _EPS:
+            return a[i] / b[i]
+
+def _get_binary_rep_as_list(n, num_digits):
+    binary_string = np.binary_repr(n).zfill(num_digits)
+    binary = []
+    for line in binary_string:
+        for c in line:
+            binary.append(int(c))
+    return binary
 
 
-def _choi_state(u):
-    vector = np.dot(np.kron(np.eye(2, 2), u), 1/np.sqrt(2)*np.array([[1], [0], [0], [1]]))
-    return vector[:, 0]
 
-# takes a qubit register with an even number of qubits and a circuit as an input. Creates the maximally entangled
-# state between the first half and the second half of the qubits.
-
-
-def _create_maximally_entangled_state(qr, qc):
-    for i in range(len(qr)//2):
-        qc.h(qr[i])
-        qc.cx(qr[i], qr[len(qr)//2+i])
 
 
 if __name__ == '__main__':
