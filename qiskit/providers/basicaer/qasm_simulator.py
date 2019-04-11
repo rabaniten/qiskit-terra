@@ -32,15 +32,15 @@ from math import log2
 from collections import Counter
 import numpy as np
 
-from qiskit._util import local_hardware_info
+from qiskit.util import local_hardware_info
 from qiskit.providers.models import BackendConfiguration
 from qiskit.result import Result
 from qiskit.providers import BaseBackend
 from qiskit.providers.basicaer.basicaerjob import BasicAerJob
 from .exceptions import BasicAerError
-from ._basicaertools import single_gate_matrix
-from ._basicaertools import cx_gate_matrix
-from ._basicaertools import einsum_vecmul_index
+from .basicaertools import single_gate_matrix
+from .basicaertools import cx_gate_matrix
+from .basicaertools import einsum_vecmul_index
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +61,7 @@ class QasmSimulatorPy(BaseBackend):
         'open_pulse': False,
         'memory': True,
         'max_shots': 65536,
+        'coupling_map': None,
         'description': 'A python simulator for qasm experiments',
         'basis_gates': ['u1', 'u2', 'u3', 'cx', 'id', 'unitary'],
         'gates': [
@@ -494,7 +495,8 @@ class QasmSimulatorPy(BaseBackend):
             for operation in experiment.instructions:
                 conditional = getattr(operation, 'conditional', None)
                 if isinstance(conditional, int):
-                    if not self._classical_register[-conditional-1]:
+                    conditional_bit_set = (self._classical_register >> conditional) & 1
+                    if not conditional_bit_set:
                         continue
                 elif conditional is not None:
                     mask = int(operation.conditional.mask, 16)
