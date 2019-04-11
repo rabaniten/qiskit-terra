@@ -51,9 +51,9 @@ class SingleQubitUnitary(CompositeGate):
 
         # Create new composite gate.
         super().__init__("init", [u], [qubit], circ)
+        self.diag = [1, 1]
         # Decompose the single-qubit unitary (and save the elementary gate into self.data)
         self._dec_single_qubit_unitary(up_to_diagonal)
-        self.diag = [1, 1]
 
     def _dec_single_qubit_unitary(self, up_to_diagonal):
         """
@@ -112,7 +112,7 @@ def ct(m):
 
 
 def is_isometry(m):
-    return np.allclose(ct(m).dot(m), np.eye(m.shape[1], m.shape[1]), _EPS)
+    return np.allclose(ct(m).dot(m), np.eye(m.shape[1], m.shape[1]), atol=_EPS)
 
 
 def squ(self, params, qubits, mode="ZYZ", up_to_diagonal=False):

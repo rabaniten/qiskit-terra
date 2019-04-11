@@ -43,7 +43,7 @@ class UCY(UCRot):  # pylint: disable=abstract-method
     def __init__(self, angle_list, q_controls, q_target, circ = None):
         super().__init__(angle_list, q_controls, q_target, "Y", circ)
         # call to generate the circuit that takes the desired vector to zero
-        self._dec_uc_rot_gate()
+        self._dec_ucrot()
 
 
 def ucy(self, angle_list, q_controls, q_target):
