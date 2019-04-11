@@ -80,7 +80,8 @@ class UCRot(CompositeGate):
         # Check if number of control qubits does correspond to the number of rotations
         if num_contr != len(q_controls):
             raise QiskitError("Number of controlled rotations does not correspond to the number of control-qubits.")
-
+        if rot_axis != "Y" and rot_axis != "Z":
+            raise QiskitError("Rotation axis is not supported.")
         # Create new composite gate.
         num_qubits = len(q_controls) + len(q_target)
         self.num_qubits = int(num_qubits)
