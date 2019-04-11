@@ -9,6 +9,10 @@
 Decomposition for uniformly controlled single-qubit unitaries test.
 """
 
+# ToDo: It might be worth to add more functionality to the class QiskitTestCase. In particular, the possibility to
+# ToDo: a gate for a set of possible input vectors (up to a global phase shift). The testing code for UCY,UCZ, UCG and
+# ToDo: and SQU could then be simplified.
+
 import unittest
 
 
@@ -22,6 +26,7 @@ from qiskit.test import QiskitTestCase
 from scipy.stats import unitary_group
 
 _EPS = 1e-10  # global variable used to chop very small numbers to zero
+
 
 class TestUCG(QiskitTestCase):
     """Qiskit UCG tests."""
