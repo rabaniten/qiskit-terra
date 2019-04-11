@@ -24,10 +24,10 @@ from qiskit import execute as q_execute
 from qiskit.test import QiskitTestCase
 
 angles = [[0], [0.4], [0, 0], [0, 0.8], [0, 0, 1, 1], [0, 1, 0.5, 1],
-          (2 * np.pi * np.random.rand(2 ** 3)).tolist(),(2 * np.pi * np.random.rand(2 ** 4)).tolist(),
+          (2 * np.pi * np.random.rand(2 ** 3)).tolist(), (2 * np.pi * np.random.rand(2 ** 4)).tolist(),
           (2 * np.pi * np.random.rand(2 ** 5)).tolist()]
 
-rot_axis=["Z","Y"]
+rot_axis = ["Z", "Y"]
 
 
 class TestUCY(QiskitTestCase):
@@ -41,7 +41,7 @@ class TestUCY(QiskitTestCase):
         q = QuantumRegister(num_contr + 1)
         # test the UC R_y gate for all possible basis states.
         for i in range(2 ** (num_contr + 1)):
-            qc = _prepare_basis_state(q, i, num_contr+1)
+            qc = _prepare_basis_state(q, i, num_contr + 1)
             if rot_axis == "Y":
                 qc.ucy(angles, q[1:num_contr + 1], q[0])
             else:
@@ -80,7 +80,7 @@ def _apply_ucr_to_basis_state(angle_list, basis_state, rot_axis):
     return state
 
 
-def _prepare_basis_state(q, i,num_qubits):
+def _prepare_basis_state(q, i, num_qubits):
     qc = QuantumCircuit(q)
     # ToDo: Remove this work around after the state vector simulator is fixed (it can't simulate the empty
     # ToDo: circuit at the moment)
