@@ -94,8 +94,12 @@ class UCRot(CompositeGate):
         Call to populate the self.data list with gates that implement the uniformly controlled rotation
         """
         if len(self.q_controls) == 0:
-            if np.abs(self.params[0]) > _EPS:
-                self._attach(RZGate(self.params[0], self.q_target))
+            if self.rot_axes == "Z":
+                if np.abs(self.params[0]) > _EPS:
+                    self._attach(RZGate(self.params[0], self.q_target))
+            if self.rot_axes == "Y":
+                if np.abs(self.params[0]) > _EPS:
+                    self._attach(RYGate(self.params[0], self.q_target))
         else:
             # First, we find the rotation angles of the single-qubit rotations acting on the target qubit
             angles = self.params.copy()
