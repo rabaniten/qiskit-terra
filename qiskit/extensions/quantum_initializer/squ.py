@@ -62,11 +62,11 @@ class SingleQubitUnitary(CompositeGate):
         # First, we find the rotation angles (where we can ignore the global phase)
         (a, b, c, _) = self._zyz_dec()
         # Add the gates to the composite gate
-        if (a % (4 * np.pi)) > _EPS:
+        if abs(a) > _EPS:
             self._attach(RZGate(a, self.qargs[0]))
-        if (b % (4 * np.pi)) > _EPS:
+        if abs(b) > _EPS:
             self._attach(RYGate(b, self.qargs[0]))
-        if (c % (4 * np.pi)) > _EPS:
+        if abs(c) > _EPS:
             if up_to_diagonal:
                 self.diag = [np.exp(-1j * c / 2.), np.exp(1j * c / 2.)]
             else:
@@ -87,13 +87,13 @@ class SingleQubitUnitary(CompositeGate):
             # Note that u10 can't be zero, since u is unitary (and u00 == 0)
             c = cmath.phase(-u01 / u10)
             d = cmath.phase(u01 * np.exp(-1j * c / 2))
-            return 0., np.pi, c, d
+            return 0., -np.pi, -c, d
         # Handle special case if the entry (0,1) of the unitary is equal to zero
         if np.abs(u01) < _EPS:
             # Note that u11 can't be zero, since u is unitary (and u01 == 0)
             c = cmath.phase(u00 / u11)
             d = cmath.phase(u00 * np.exp(-1j * c / 2))
-            return 0, 0, c, d
+            return 0., 0., -c, d
         b = 2 * np.arccos(np.abs(u00))
         if 0 < np.sin(b / 2) - np.cos(b / 2):
             c = cmath.phase(-u00 / u10)
