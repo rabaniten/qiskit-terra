@@ -32,7 +32,7 @@ _EPS = 1e-10  # global variable used to chop very small numbers to zero
 
 class DiagGate(CompositeGate):  # pylint: disable=abstract-method
     """
-    diag =  list of the 2^k diagonal entries (for a diagonal gate on k qubits)
+    diag =  list of the 2^k diagonal entries (for a diagonal gate on k qubits). Must contain at least two entries.
      q   =  list of k qubits the diagonal is acting on (the order of the qubits specifies the computational basis in
             which the diagonal gate is provided: the first element in diag acts on the state where all the qubits
             in q are in the state 0, the second entry acts on the state where all the qubits q[1],...,q[k-1] are in the
@@ -54,8 +54,8 @@ class DiagGate(CompositeGate):  # pylint: disable=abstract-method
         """Check input form"""
         # Check if the right number of diagonal entries is provided and if the diagonal entries have absolute value one.
         num_action_qubits = math.log2(len(diag))
-        if num_action_qubits < 0 or not num_action_qubits.is_integer():
-            raise QiskitError("The number of diagonal entrie is not non negative power of 2.")
+        if num_action_qubits < 1 or not num_action_qubits.is_integer():
+            raise QiskitError("The number of diagonal entries is not a positive power of 2.")
         for z in diag:
             try:
                 complex(z)
@@ -77,8 +77,6 @@ class DiagGate(CompositeGate):  # pylint: disable=abstract-method
         """
         n = len(self.params)
         num_qubits = int(np.log2(n))
-        if n == 0 or n == 1:
-            return None
         # Since the diagonal is a unitary, all its entries have absolute value one and the diagonal is fully specified
         #  by the phases of its entries
         diag_phases = [cmath.phase(z) for z in self.params]

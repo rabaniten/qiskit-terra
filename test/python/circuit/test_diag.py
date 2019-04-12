@@ -10,6 +10,7 @@ Decomposition for uniformly conteolled R_z rotation test.
 """
 
 import unittest
+import math
 
 from qiskit import QuantumCircuit
 from qiskit import QuantumRegister
@@ -23,7 +24,7 @@ from qiskit.test import QiskitTestCase
 class TestDiagGate(QiskitTestCase):
     """Diagonal gate tests."""
     @parameterized.expand(
-        [[[0.2]],[[0,0]],[[0,0.8]],[[0,0,1,1]],[[0,1,0.5,1]],[(2*np.pi*np.random.rand(2**3)).tolist()],
+        [[[0,0]],[[0,0.8]],[[0,0,1,1]],[[0,1,0.5,1]],[(2*np.pi*np.random.rand(2**3)).tolist()],
         [(2 * np.pi * np.random.rand(2 ** 4)).tolist()],[(2*np.pi*np.random.rand(2**5)).tolist()]]
     )
     def test_diag_gate(self, phases):
@@ -32,30 +33,19 @@ class TestDiagGate(QiskitTestCase):
         q = QuantumRegister(num_qubits)
         # test the diagonal gate for all possible basis states.
         for i in range(2**(num_qubits)):
-            qc = QuantumCircuit(q)
-            binary_rep = get_binary_rep_as_list(i, num_qubits)
-            for j in range(len(binary_rep)):
-                if binary_rep[j] == 1:
-                    qc.x(q[- (j+1)])
-            qc.diag_gate(diag, q[0:num_qubits])
+            qc = _prepare_basis_state(q, i)
+            qc.diag(diag, q[0:num_qubits])
             vec_out = np.asarray(q_execute(qc, BasicAer.get_backend(
                 'statevector_simulator')).result().get_statevector(qc, decimals=16))
-            vec_desired = apply_diag_gate_to_basis_state(phases, i)
+            vec_desired = _apply_diag_gate_to_basis_state(phases, i)
             if i == 0:
                 global_phase = vec_out[0]/vec_desired[0]
             vec_desired = (global_phase*vec_desired).tolist()
-            # Remark: We should not take the fidelity to measure the overlap over the states, since the fidelity ignores
-            # the global phase (and hence the phase relation between the different columns of the unitary that the gate
-            # should implement)
             dist = np.linalg.norm(np.array(vec_desired - vec_out))
             self.assertAlmostEqual(dist, 0)
 
 
-if __name__ == '__main__':
-    unittest.main()
-
-
-def apply_diag_gate_to_basis_state(phases, basis_state):
+def _apply_diag_gate_to_basis_state(phases, basis_state):
     # ToDo: improve efficiency here by implementing a simulation for diagonal gates
     num_qubits = int(np.log2(len(phases)))
     ph = phases[basis_state]
@@ -64,10 +54,27 @@ def apply_diag_gate_to_basis_state(phases, basis_state):
     return state
 
 
-def get_binary_rep_as_list(n, num_digits):
+def _get_binary_rep_as_list(n, num_digits):
     binary_string = np.binary_repr(n).zfill(num_digits)
     binary = []
     for line in binary_string:
         for c in line:
             binary.append(int(c))
     return binary
+
+def _prepare_basis_state(q, i):
+    num_qubits = len(q)
+    qc = QuantumCircuit(q)
+    # ToDo: Remove this work around after the state vector simulator is fixed (it can't simulate the empty
+    # ToDo: circuit at the moment)
+    qc.iden(q[0])
+    binary_rep = _get_binary_rep_as_list(i, num_qubits)
+    for j in range(len(binary_rep)):
+        if binary_rep[j] == 1:
+            qc.x(q[- (j + 1)])
+    return qc
+
+
+if __name__ == '__main__':
+    unittest.main()
+

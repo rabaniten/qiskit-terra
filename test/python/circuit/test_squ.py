@@ -36,10 +36,6 @@ class TestSingleQubitUnitary(QiskitTestCase):
         # test the squ for all possible basis states.
         for i in range(2):
             qc = _prepare_basis_state(q, i)
-            # ToDo: Remove this work around after the state vector simulator is fixed (it can't simulate the empty
-            # ToDo: circuit at the moment)
-            qc.x(q[0])
-            qc.x(q[0])
             qc.squ(u, q[0])
             # ToDo: improve efficiency here by allowing to execute circuit on several states in parallel (this would
             # ToDo: in particular allow to get out the isometry the circuit is implementing by applying it to the first
@@ -70,10 +66,6 @@ class TestSingleQubitUnitaryUpToDiagonal(QiskitTestCase):
         # test the squ for all possible basis states.
         for i in range(2):
             qc = _prepare_basis_state(q, i)
-            # ToDo: Remove this work around after the state vector simulator is fixed (it can't simulate the empty
-            # ToDo: circuit at the moment)
-            qc.x(q[0])
-            qc.x(q[0])
             sqg = SingleQubitUnitary(u, q[0], up_to_diagonal=True)
             qc._attach(sqg)
             # ToDo: improve efficiency here by allowing to execute circuit on several states in parallel (this would
@@ -91,8 +83,12 @@ class TestSingleQubitUnitaryUpToDiagonal(QiskitTestCase):
 
 
 def _prepare_basis_state(q, i):
+    num_qubits=len(q)
     qc = QuantumCircuit(q)
-    binary_rep = _get_binary_rep_as_list(i, 1)
+    # ToDo: Remove this work around after the state vector simulator is fixed (it can't simulate the empty
+    # ToDo: circuit at the moment)
+    qc.iden(q[0])
+    binary_rep = _get_binary_rep_as_list(i, num_qubits)
     for j in range(len(binary_rep)):
         if binary_rep[j] == 1:
             qc.x(q[- (j + 1)])
