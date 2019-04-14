@@ -6,7 +6,7 @@
 # the LICENSE.txt file in the root directory of this source tree.
 
 """
-Test decomposition of uniformly ccontrolled rotations.
+Test the decomposition of uniformly controlled rotations.
 """
 
 _EPS = 1e-10  # global variable used to chop very small numbers to zero
