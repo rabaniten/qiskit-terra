@@ -115,17 +115,16 @@ class Isometry(CompositeGate):
         remaining_isometry = self.params[0].astype(complex)  # note that "astype" does copy the isometry
         diag = []
         m = int(np.log2((self.params[0]).shape[1]))
+        # Decompose the column with index column_index and attache the gate to the CompositeGate object. Return the
+        # isometry that is left to decompose, where the columns up to index column_index correspond to the first
+        # few columns of the identity matrix up to diag, and hence we only have to save a list containing them.
         for column_index in range(2**m):
-            # decompose the column with index column_index and attache the gate to the CompositeGate object. Return the
-            # isometry which is left to decompose, where the columns up to index column_index correspond to the first
-            # few columns of the identity matrix up to diag, and hence we only have to save a list containing them.
             (diag, remaining_isometry) = self._decompose_column(diag, remaining_isometry, column_index)
             # extract phase of the state that was sent to the basis state ket(column_index)
             diag.append(remaining_isometry[column_index, 0])
+            # remove first column (which is now stored in diag)
             remaining_isometry = remaining_isometry[:, 1:]
-        # ToDo: Implement diagonal gate for one diagonal entry (do nothing). Do not implement the diagonal gate if it is
-        # ToDo: equal to the identity.
-        if len(diag) > 1:
+        if len(diag) > 1 and not diag_is_identity_up_to_global_phase(diag):
             self._attach(DiagGate(np.conj(diag).tolist(), self.q_input))
 
     def _decompose_column(self, diag, remaining_isometry, column_index):
@@ -139,16 +138,18 @@ class Isometry(CompositeGate):
 
     def _disentangle(self, diag, remaining_isometry, column_index, s):
         """
-        Disentangle the sth significant qubit (starting with s=0) into the zero or the one state
+        Disentangle the s-th significant qubit (starting with s = 0) into the zero or the one state
         (dependent on column_index)
         """
+        # To shorten the notation, we introduce:
         k = column_index
         # k_prime is the index of the column with index column_index in the remaining isometry (note that we
-        # remove columns of the isometry during the procedure)
+        # remove columns of the isometry during the procedure for efficiency)
         k_prime = 0
         v = remaining_isometry
         n = int(np.log2(self.params[0].shape[0]))
-        """MCG"""
+
+        """MCG to set one entry to zero (preparation for disentangling with UCG)"""
         index1 = 2*a(k,s+1)*2**s+b(k,s+1)
         index2 = (2*a(k,s+1)+1)*2**s+b(k,s+1)
         target_label = n - s - 1
@@ -165,13 +166,14 @@ class Isometry(CompositeGate):
             _apply_diagonal_gate(v, control_labels + [target_label], diag_mcg_inverse)
             # update the diag according to the applied diagonal gate
             _apply_diagonal_gate_to_diag(diag, control_labels + [target_label], diag_mcg_inverse, n)
-        """UCG"""
+
+        """UCG to disentangle a qubit"""
         # Find the UCG, decompose it and apply it to the remaining isometry
         single_qubit_gates = self._find_squs_for_disentangling(v, k, s)
-        if not is_identity(single_qubit_gates):
+        if not _ucg_is_identity_up_to_global_phase(single_qubit_gates):
             control_labels = list(range(target_label))
             diagonal_ucg = self._attach_ucg_up_to_diagonal(single_qubit_gates, control_labels, target_label)
-            # merge the diagonal into the UCG for efficient appliaction of both together
+            # merge the diagonal into the UCG for efficient application of both together
             diagonal_ucg_inverse = np.conj(diagonal_ucg).tolist()
             single_qubit_gates = _merge_UCG_and_diag(single_qubit_gates, diagonal_ucg_inverse)
             # apply the UCG (with the merged diagonal gate) to the remaining isometry
@@ -404,12 +406,26 @@ def get_binary_rep_as_list(n, num_digits):
     return binary[-num_digits:]
 
 
-def is_identity(single_qubit_gates):
+def _ucg_is_identity_up_to_global_phase(single_qubit_gates):
+    if not np.abs(single_qubit_gates[0][0, 0]) < _EPS:
+        global_phase = 1. / (single_qubit_gates[0][0, 0])
+    else:
+        return False
     for gate in single_qubit_gates:
-        if not np.allclose(gate,np.eye(2,2)):
+        if not np.allclose(global_phase * gate, np.eye(2, 2)):
             return False
     return True
 
+
+def diag_is_identity_up_to_global_phase(diag):
+    if not np.abs(diag[0]) < _EPS:
+        global_phase = 1. / (diag[0])
+    else:
+        return False
+    for d in diag:
+        if not np.abs(global_phase*d-1) < _EPS:
+            return False
+    return True
 
 def iso(self, isometry, q_input, q_ancillas_for_output, q_ancillas_zero=[], q_ancillas_dirty=[]):
     return self._attach(Isometry(isometry, q_input, q_ancillas_for_output, q_ancillas_zero, q_ancillas_dirty, self))
