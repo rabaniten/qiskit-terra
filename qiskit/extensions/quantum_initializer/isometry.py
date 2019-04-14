@@ -6,12 +6,11 @@
 # the LICENSE.txt file in the root directory of this source tree.
 
 """
-Arbitrary isometry from m to n qubits.
+Generic isometries from m to n qubits.
 """
 
 import math
 import numpy as np
-import scipy
 
 from qiskit.exceptions import QiskitError
 from qiskit.circuit import QuantumCircuit
@@ -25,31 +24,38 @@ import itertools
 _EPS = 1e-10  # global variable used to chop very small numbers to zero
 
 
-class Isometry(CompositeGate):  # pylint: disable=abstract-method
-    """Decomposition of arbitrary isometries from m to n qubits.
-    In particular, this allows to decompose unitaries (m=n) and to do state preparation (m=0).
-
+class Isometry(CompositeGate):
+    """Decomposition of arbitrary isometries from m to n qubits. In particular, this allows to decompose 
+    unitaries (m=n) and to do state preparation (m=0).
+    
     The decomposition is based on https://arxiv.org/abs/1501.06911.
 
-    It inherits from CompositeGate in the same way that the Fredkin (cswap)
-    gate does. Therefore self.data is the list of gates (in order) that must
-    be applied to implement this meta-gate.
-
-    params = an isometry from m to n qubits, i.e., a (complex) np.ndarray of dimension 2^n*2^m with orthonormal columns
-            (given in the computational basis specified by the order of the ancillas and the input qubits,
-            where the ancillas are considered to be more significant than the input qubits.)
-    q_input = list of qubits where the input to the isometry is provided on (empty list for state preparation)
-              The qubits are listed with increasing significance.
-    q_ancilla = list of ancilla qubits (which are assumed to start in the zero state).
+    Input:
+    params =     an isometry from m to n qubits, i.e., a (complex) np.ndarray of dimension 2^n*2^m with orthonormal 
+                columns (given in the computational basis specified by the order of the ancillas and the input qubits,
+                where the ancillas are considered to be more significant than the input qubits.)
+                
+    q_input =    list of m qubits where the input to the isometry is feeded in (empty list for state preparation)
                 The qubits are listed with increasing significance.
-    circ = QuantumCircuit or CompositeGate containing this gate
+            
+    q_ancillas_for_output = list of n-m ancilla qubits that are used for the output of the isometry 
+                    (and which are assumed to start in the zero state). 
+                    The qubits are listed with increasing significance.
+            
+    q_ancillas_zero = list of ancilla qubits (which are assumed to start in the zero state).
+                    The qubits are listed with increasing significance. 
+    
+    q_ancillas_dirty = list of ancilla qubits (which can start in an arbitrary state).
+                    The qubits are listed with increasing significance.
+                
+    circ =      QuantumCircuit or CompositeGate containing this gate
     """
 
     """
     Notation: In the following decomposition we label the qubit by 
-    0 - most significant one
+    0 -> most significant one
     ...
-    n - least significant one
+    n -> least significant one
     finally, we convert the labels back to the qubit numbering used in Qiskit (using: _get_qubits_by_label)
     """
 
@@ -59,22 +65,19 @@ class Isometry(CompositeGate):  # pylint: disable=abstract-method
         self.q_ancillas_zero = q_ancillas_zero
         self.q_ancillas_dirty = q_ancillas_dirty
 
-        # Check if q_input and q_ancillas have type "list"
+        # Check if q_input and q_ancillas_for_output have type "list"
         if not type(q_input) == list:
             raise QiskitError("The input qubits must be provided as a list.")
         if not type(q_ancillas_for_output) == list:
             raise QiskitError("The ancilla qubits must be provided as a list.")
-        # Check type of isometry
-        if not type(isometry) == np.ndarray:
-            raise QiskitError("The isometry is not of type numpy.ndarray.")
 
         # Check if the isometry has the right dimension and if the columns are orthonormal
         n = np.log2(isometry.shape[0])
         m = np.log2(isometry.shape[1])
-        if not n == int(n):
-            raise QiskitError("The number of rows of the isometry is not a power of 2.")
-        if not m == int(m):
-            raise QiskitError("The number of columns of the isometry is not a power of 2.")
+        if not n.is_integer() or if n < 0:
+            raise QiskitError("The number of rows of the isometry is not a non negative power of 2.")
+        if not m.is_integer() or m < 0:
+            raise QiskitError("The number of columns of the isometry is not a non negative power of 2.")
         if m > n:
             raise QiskitError("The input matrix has more columns than rows and hence it can't be an isometry.")
         if not is_isometry(isometry, _EPS):
@@ -92,12 +95,11 @@ class Isometry(CompositeGate):  # pylint: disable=abstract-method
         self.num_qubits = int(num_qubits)
         qubits = q_input + q_ancillas_for_output + q_ancillas_zero + q_ancillas_dirty
         super().__init__("init", [isometry], qubits, circ)
-        # Check if a qubit is provided as an input AND an ancilla qubit
+        # Check if a qubit is provided as an input AND as an ancilla qubit
         self._check_dups(qubits, message="There is an input qubit that is also listed as an ancilla qubit.")
-        # call to generate the circuit that takes the desired vector to zero
+        # call to generate the circuit that takes the isometry to the first 2^m columns of the 2^n identity matrix
         self._gates_to_uncompute()
-        # invert the circuit to create the desired vector from zero (assuming
-        # the qubits are in the zero state)
+        # invert the circuit to create the circuit implementing the isometry
         self.inverse()
         # do not set the inverse flag, as this is the actual initialize gate
         # we just used inverse() as a method to obtain it
@@ -108,7 +110,6 @@ class Isometry(CompositeGate):  # pylint: disable=abstract-method
         Call to populate the self.data list with gates that takes the
         desired isometry to the first 2^m columns of the 2^n*2^n identity matrix (see https://arxiv.org/abs/1501.06911)
         """
-
         # Copy the isometry (this is computationally expensive for large isometries but guarantees to keep a copy
         # of the input isometry)
         remaining_isometry = self.params[0].astype(complex)  # note that "astype" does copy the isometry
@@ -122,7 +123,8 @@ class Isometry(CompositeGate):  # pylint: disable=abstract-method
             # extract phase of the state that was sent to the basis state ket(column_index)
             diag.append(remaining_isometry[column_index, 0])
             remaining_isometry = remaining_isometry[:, 1:]
-        # ToDo: Implement diagonal gate for one diagonal entry (do nothing)
+        # ToDo: Implement diagonal gate for one diagonal entry (do nothing). Do not implement the diagonal gate if it is
+        # ToDo: equal to the identity.
         if len(diag) > 1:
             self._attach(DiagGate(np.conj(diag).tolist(), self.q_input))
 
