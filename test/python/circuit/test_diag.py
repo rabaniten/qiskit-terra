@@ -6,11 +6,10 @@
 # the LICENSE.txt file in the root directory of this source tree.
 
 """
-Decomposition for uniformly conteolled R_z rotation test.
+Diagonal gate tests.
 """
 
 import unittest
-import math
 
 from qiskit import QuantumCircuit
 from qiskit import QuantumRegister
@@ -22,25 +21,24 @@ from qiskit.test import QiskitTestCase
 
 
 class TestDiagGate(QiskitTestCase):
-    """Diagonal gate tests."""
     @parameterized.expand(
-        [[[0,0]],[[0,0.8]],[[0,0,1,1]],[[0,1,0.5,1]],[(2*np.pi*np.random.rand(2**3)).tolist()],
-        [(2 * np.pi * np.random.rand(2 ** 4)).tolist()],[(2*np.pi*np.random.rand(2**5)).tolist()]]
+        [[[0, 0]], [[0, 0.8]], [[0, 0, 1, 1]], [[0, 1, 0.5, 1]], [(2 * np.pi * np.random.rand(2 ** 3)).tolist()],
+         [(2 * np.pi * np.random.rand(2 ** 4)).tolist()], [(2 * np.pi * np.random.rand(2 ** 5)).tolist()]]
     )
     def test_diag_gate(self, phases):
-        diag = [np.exp(1j*ph) for ph in phases]
+        diag = [np.exp(1j * ph) for ph in phases]
         num_qubits = int(np.log2(len(diag)))
         q = QuantumRegister(num_qubits)
         # test the diagonal gate for all possible basis states.
-        for i in range(2**(num_qubits)):
+        for i in range(2 ** (num_qubits)):
             qc = _prepare_basis_state(q, i)
             qc.diag(diag, q[0:num_qubits])
             vec_out = np.asarray(q_execute(qc, BasicAer.get_backend(
                 'statevector_simulator')).result().get_statevector(qc, decimals=16))
             vec_desired = _apply_diag_gate_to_basis_state(phases, i)
             if i == 0:
-                global_phase = vec_out[0]/vec_desired[0]
-            vec_desired = (global_phase*vec_desired).tolist()
+                global_phase = vec_out[0] / vec_desired[0]
+            vec_desired = (global_phase * vec_desired).tolist()
             dist = np.linalg.norm(np.array(vec_desired - vec_out))
             self.assertAlmostEqual(dist, 0)
 
@@ -50,7 +48,7 @@ def _apply_diag_gate_to_basis_state(phases, basis_state):
     num_qubits = int(np.log2(len(phases)))
     ph = phases[basis_state]
     state = np.zeros(2 ** num_qubits, dtype=complex)
-    state[basis_state] = np.exp(1j*ph)
+    state[basis_state] = np.exp(1j * ph)
     return state
 
 
@@ -61,6 +59,7 @@ def _get_binary_rep_as_list(n, num_digits):
         for c in line:
             binary.append(int(c))
     return binary
+
 
 def _prepare_basis_state(q, i):
     num_qubits = len(q)
@@ -77,4 +76,3 @@ def _prepare_basis_state(q, i):
 
 if __name__ == '__main__':
     unittest.main()
-
