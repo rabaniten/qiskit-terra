@@ -30,46 +30,42 @@ _EPS = 1e-10  # global variable used to chop very small numbers to zero
 _id = np.eye(2,2)
 _not = np.matrix([[0,1],[1,0]])
 
-squs = [[_not],[_id,_id],[_id,1j*_id],[_id,_not,_id,_not],[unitary_group.rvs(2) for i in range(2**2)],
+squs_list = [[_not],[_id,_id],[_id,1j*_id],[_id,_not,_id,_not],[unitary_group.rvs(2) for i in range(2**2)],
          [unitary_group.rvs(2) for i in range(2**3)],[unitary_group.rvs(2) for i in range(2**4)]]
 
-up_to_diagonal = [True, False]
+up_to_diagonal_list = [True, False]
 
 
 class TestUCG(QiskitTestCase):
     """Qiskit UCG tests."""
-    @parameterized.expand(
-        itertools.product(squs, up_to_diagonal)
-    )
-    def test_ucg(self, squs, up_to_diagonal):
-        num_con = int(np.log2(len(squs)))
-        q = QuantumRegister(num_con+1)
-        # test the UC gate for all possible basis states.
-        for i in range(2**(num_con+1)):
-            qc = _prepare_basis_state(q, i)
-            if up_to_diagonal:
-                ucg = UCG(squs, q[1:num_con + 1], q[0], up_to_diagonal = True)
-            else:
-                ucg = UCG(squs, q[1:num_con + 1], q[0])
-            qc._attach(ucg)
-            # ToDo: improve efficiency here by allowing to execute circuit on several states in parallel (this would
-            # ToDo: in particular allow to get out the isometry the circuit is implementing by applying it to the first
-            # ToDo: few basis vectors
-            vec_out = np.asarray(q_execute(qc, BasicAer.get_backend(
-                'statevector_simulator')).result().get_statevector(qc, decimals=16))
-            if up_to_diagonal:
-                vec_out = np.array(ucg.diag) * vec_out
-            vec_desired = _apply_squ_to_basis_state(squs, i)
-            # It is fine if the gate is implemented up to a global phase (however, the phases between the different
-            # outputs for different bases states must be correct!
-            if i == 0:
-                global_phase = _get_global_phase(vec_out, vec_desired)
-            vec_desired = (global_phase*vec_desired).tolist()
-            # Remark: We should not take the fidelity to measure the overlap over the states, since the fidelity ignores
-            # the global phase (and hence the phase relation between the different columns of the unitary that the gate
-            # should implement)
-            dist = np.linalg.norm(np.array(vec_desired - vec_out))
-            self.assertAlmostEqual(dist, 0)
+    def test_ucg(self):
+        for squs, up_to_diagonal in itertools.product(squs_list, up_to_diagonal_list):
+            with self.subTest(single_qubit_unitaries=squs, up_to_diagonal=up_to_diagonal):
+                num_con = int(np.log2(len(squs)))
+                q = QuantumRegister(num_con + 1)
+                # test the UC gate for all possible basis states.
+                for i in range(2 ** (num_con + 1)):
+                    qc = _prepare_basis_state(q, i)
+                    ucg = UCG(squs, q[1:num_con + 1], q[0], up_to_diagonal=up_to_diagonal)
+                    qc._attach(ucg)
+                    # ToDo: improve efficiency here by allowing to execute circuit on several states in parallel (this would
+                    # ToDo: in particular allow to get out the isometry the circuit is implementing by applying it to the first
+                    # ToDo: few basis vectors
+                    vec_out = np.asarray(q_execute(qc, BasicAer.get_backend(
+                        'statevector_simulator')).result().get_statevector(qc, decimals=16))
+                    if up_to_diagonal:
+                        vec_out = np.array(ucg.diag) * vec_out
+                    vec_desired = _apply_squ_to_basis_state(squs, i)
+                    # It is fine if the gate is implemented up to a global phase (however, the phases between the different
+                    # outputs for different bases states must be correct!
+                    if i == 0:
+                        global_phase = _get_global_phase(vec_out, vec_desired)
+                    vec_desired = (global_phase * vec_desired).tolist()
+                    # Remark: We should not take the fidelity to measure the overlap over the states, since the fidelity ignores
+                    # the global phase (and hence the phase relation between the different columns of the unitary that the gate
+                    # should implement)
+                    dist = np.linalg.norm(np.array(vec_desired - vec_out))
+                    self.assertAlmostEqual(dist, 0)
 
 
 def _prepare_basis_state(q, i):

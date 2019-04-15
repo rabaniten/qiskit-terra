@@ -15,7 +15,6 @@ import itertools
 import unittest
 
 import numpy as np
-from parameterized import parameterized
 
 from qiskit import BasicAer
 from qiskit import QuantumCircuit
@@ -23,42 +22,40 @@ from qiskit import QuantumRegister
 from qiskit import execute as q_execute
 from qiskit.test import QiskitTestCase
 
-angles = [[0], [0.4], [0, 0], [0, 0.8], [0, 0, 1, 1], [0, 1, 0.5, 1],
+angles_list = [[0], [0.4], [0, 0], [0, 0.8], [0, 0, 1, 1], [0, 1, 0.5, 1],
           (2 * np.pi * np.random.rand(2 ** 3)).tolist(), (2 * np.pi * np.random.rand(2 ** 4)).tolist(),
           (2 * np.pi * np.random.rand(2 ** 5)).tolist()]
 
-rot_axis = ["Z", "Y"]
+rot_axis_list = ["Z", "Y"]
 
 
 class TestUCY(QiskitTestCase):
     """Qiskit tests for UCY and UCZ rotations gates."""
-
-    @parameterized.expand(
-        itertools.product(angles, rot_axis)
-    )
-    def test_ucy(self, angles, rot_axis):
-        num_contr = int(np.log2(len(angles)))
-        q = QuantumRegister(num_contr + 1)
-        # test the UC R_y gate for all possible basis states.
-        for i in range(2 ** (num_contr + 1)):
-            qc = _prepare_basis_state(q, i, num_contr + 1)
-            if rot_axis == "Y":
-                qc.ucy(angles, q[1:num_contr + 1], q[0])
-            else:
-                qc.ucz(angles, q[1:num_contr + 1], q[0])
-            # ToDo: improve efficiency here by allowing to execute circuit on several states in parallel (this would
-            # ToDo: in particular allow to get out the isometry the circuit is implementing by applying it to the first
-            # ToDo: few basis vectors
-            vec_out = np.asarray(q_execute(qc, BasicAer.get_backend(
-                'statevector_simulator')).result().get_statevector(qc, decimals=16))
-            vec_desired = _apply_ucr_to_basis_state(angles, i, rot_axis)
-            # It is fine if the gate is implemented up to a global phase (however, the phases between the different
-            # outputs for different bases states must be correct!)
-            if i == 0:
-                global_phase = _get_global_phase(vec_out, vec_desired)
-            vec_desired = (global_phase * vec_desired).tolist()
-            dist = np.linalg.norm(np.array(vec_desired - vec_out))
-            self.assertAlmostEqual(dist, 0)
+    def test_ucy(self):
+        for angles, rot_axis in itertools.product(angles_list, rot_axis_list):
+            with self.subTest(angles=angles, rot_axis=rot_axis):
+                num_contr = int(np.log2(len(angles)))
+                q = QuantumRegister(num_contr + 1)
+                # test the UC R_y gate for all possible basis states.
+                for i in range(2 ** (num_contr + 1)):
+                    qc = _prepare_basis_state(q, i, num_contr + 1)
+                    if rot_axis == "Y":
+                        qc.ucy(angles, q[1:num_contr + 1], q[0])
+                    else:
+                        qc.ucz(angles, q[1:num_contr + 1], q[0])
+                    # ToDo: improve efficiency here by allowing to execute circuit on several states in parallel (this would
+                    # ToDo: in particular allow to get out the isometry the circuit is implementing by applying it to the first
+                    # ToDo: few basis vectors
+                    vec_out = np.asarray(q_execute(qc, BasicAer.get_backend(
+                        'statevector_simulator')).result().get_statevector(qc, decimals=16))
+                    vec_desired = _apply_ucr_to_basis_state(angles, i, rot_axis)
+                    # It is fine if the gate is implemented up to a global phase (however, the phases between the different
+                    # outputs for different bases states must be correct!)
+                    if i == 0:
+                        global_phase = _get_global_phase(vec_out, vec_desired)
+                    vec_desired = (global_phase * vec_desired).tolist()
+                    dist = np.linalg.norm(np.array(vec_desired - vec_out))
+                    self.assertAlmostEqual(dist, 0)
 
 
 def _apply_ucr_to_basis_state(angle_list, basis_state, rot_axis):

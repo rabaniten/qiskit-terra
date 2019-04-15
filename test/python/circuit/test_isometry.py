@@ -15,53 +15,52 @@ Tests for the decomposition of isometries from m to n qubits.
 
 import unittest
 
+import numpy as np
+from scipy.stats import unitary_group
 
+from qiskit import BasicAer
 from qiskit import QuantumCircuit
 from qiskit import QuantumRegister
-from qiskit import BasicAer
-import numpy as np
-from parameterized import parameterized
 from qiskit import execute as q_execute
 from qiskit.test import QiskitTestCase
-from scipy.stats import unitary_group
 
 _EPS = 1e-10  # global variable used to chop very small numbers to zero
 
 
 class TestUCG(QiskitTestCase):
     """Qiskit isometry tests."""
-    @parameterized.expand(
-        [[np.eye(4,4)],[unitary_group.rvs(4)[:,0:2]],[np.eye(4,4)[:,0:2]],[unitary_group.rvs(4)],
-         [np.eye(4,4)[:,np.random.permutation(np.eye(4,4).shape[1])][:,0:2]],
-         [np.eye(8, 8)[:, np.random.permutation(np.eye(8, 8).shape[1])]],
-         [unitary_group.rvs(8)[:,0:4]],[unitary_group.rvs(8)],[unitary_group.rvs(16)],[unitary_group.rvs(16)[:,0:8]]]
-    )
-    def test_isometry(self, iso):
-        num_q_input = int(np.log2(iso.shape[1]))
-        num_q_ancilla_for_output = int(np.log2(iso.shape[0])) - num_q_input
-        n = num_q_input + num_q_ancilla_for_output
-        q = QuantumRegister(n)
-        # test the isometry for all possible input basis states.
-        for i in range(2**num_q_input):
-            qc = _prepare_basis_state(q, i)
-            qc.iso(iso, q[:num_q_input], q[num_q_input:])
-            # ToDo: improve efficiency here by allowing to execute circuit on several states in parallel (this would
-            # ToDo: in particular allow to get out the isometry the circuit is implementing by applying it to the first
-            # ToDo: few basis vectors)
-            vec_out = np.asarray(q_execute(qc, BasicAer.get_backend(
-                'statevector_simulator')).result().get_statevector(qc, decimals=16))
-            vec_desired = _apply_isometry_to_basis_state(iso, i)
-            # It is fine if the gate is implemented up to a global phase (however, the phases between the different
-            # outputs for different bases states must be correct!
-            if i == 0:
-                global_phase = _get_global_phase(vec_out, vec_desired)
-            vec_desired = (global_phase*vec_desired).tolist()
-            dist = np.linalg.norm(np.array(vec_desired - vec_out))
-            self.assertAlmostEqual(dist, 0)
+    def test_isometry(self):
+        for iso in [np.eye(4, 4), unitary_group.rvs(4)[:, 0:2], np.eye(4, 4)[:, 0:2], unitary_group.rvs(4),
+                    np.eye(4, 4)[:, np.random.permutation(np.eye(4, 4).shape[1])][:, 0:2],
+                    np.eye(8, 8)[:, np.random.permutation(np.eye(8, 8).shape[1])],
+                    unitary_group.rvs(8)[:, 0:4], unitary_group.rvs(8), unitary_group.rvs(16),
+                    unitary_group.rvs(16)[:, 0:8]]:
+            with self.subTest(iso=iso):
+                num_q_input = int(np.log2(iso.shape[1]))
+                num_q_ancilla_for_output = int(np.log2(iso.shape[0])) - num_q_input
+                n = num_q_input + num_q_ancilla_for_output
+                q = QuantumRegister(n)
+                # test the isometry for all possible input basis states.
+                for i in range(2 ** num_q_input):
+                    qc = _prepare_basis_state(q, i)
+                    qc.iso(iso, q[:num_q_input], q[num_q_input:])
+                    # ToDo: improve efficiency here by allowing to execute circuit on several states in parallel (this would
+                    # ToDo: in particular allow to get out the isometry the circuit is implementing by applying it to the first
+                    # ToDo: few basis vectors)
+                    vec_out = np.asarray(q_execute(qc, BasicAer.get_backend(
+                        'statevector_simulator')).result().get_statevector(qc, decimals=16))
+                    vec_desired = _apply_isometry_to_basis_state(iso, i)
+                    # It is fine if the gate is implemented up to a global phase (however, the phases between the different
+                    # outputs for different bases states must be correct!
+                    if i == 0:
+                        global_phase = _get_global_phase(vec_out, vec_desired)
+                    vec_desired = (global_phase * vec_desired).tolist()
+                    dist = np.linalg.norm(np.array(vec_desired - vec_out))
+                    self.assertAlmostEqual(dist, 0)
 
 
 def _prepare_basis_state(q, i):
-    num_qubits=len(q)
+    num_qubits = len(q)
     qc = QuantumCircuit(q)
     # ToDo: Remove this work around after the state vector simulator is fixed (it can't simulate the empty
     # ToDo: circuit at the moment)
@@ -74,7 +73,7 @@ def _prepare_basis_state(q, i):
 
 
 def _apply_isometry_to_basis_state(iso, basis_state):
-    return iso[:,basis_state]
+    return iso[:, basis_state]
 
 
 def _get_binary_rep_as_list(n, num_digits):
@@ -89,7 +88,7 @@ def _get_binary_rep_as_list(n, num_digits):
 def _get_global_phase(a, b):
     for i in range(len(b)):
         if abs(b[i]) > _EPS:
-            return a[i]/b[i]
+            return a[i] / b[i]
 
 
 if __name__ == '__main__':

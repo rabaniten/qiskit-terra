@@ -15,32 +15,31 @@ from qiskit import QuantumCircuit
 from qiskit import QuantumRegister
 from qiskit import BasicAer
 import numpy as np
-from parameterized import parameterized
 from qiskit import execute as q_execute
 from qiskit.test import QiskitTestCase
 
 
 class TestDiagGate(QiskitTestCase):
-    @parameterized.expand(
-        [[[0, 0]], [[0, 0.8]], [[0, 0, 1, 1]], [[0, 1, 0.5, 1]], [(2 * np.pi * np.random.rand(2 ** 3)).tolist()],
-         [(2 * np.pi * np.random.rand(2 ** 4)).tolist()], [(2 * np.pi * np.random.rand(2 ** 5)).tolist()]]
-    )
-    def test_diag_gate(self, phases):
-        diag = [np.exp(1j * ph) for ph in phases]
-        num_qubits = int(np.log2(len(diag)))
-        q = QuantumRegister(num_qubits)
-        # test the diagonal gate for all possible basis states.
-        for i in range(2 ** (num_qubits)):
-            qc = _prepare_basis_state(q, i)
-            qc.diag(diag, q[0:num_qubits])
-            vec_out = np.asarray(q_execute(qc, BasicAer.get_backend(
-                'statevector_simulator')).result().get_statevector(qc, decimals=16))
-            vec_desired = _apply_diag_gate_to_basis_state(phases, i)
-            if i == 0:
-                global_phase = vec_out[0] / vec_desired[0]
-            vec_desired = (global_phase * vec_desired).tolist()
-            dist = np.linalg.norm(np.array(vec_desired - vec_out))
-            self.assertAlmostEqual(dist, 0)
+    def test_diag_gate(self):
+        for phases in [[0, 0], [0, 0.8], [0, 0, 1, 1], [0, 1, 0.5, 1],
+                       (2 * np.pi * np.random.rand(2 ** 3)).tolist(),
+                       (2 * np.pi * np.random.rand(2 ** 4)).tolist(), (2 * np.pi * np.random.rand(2 ** 5)).tolist()]:
+            with self.subTest(phases=phases):
+                diag = [np.exp(1j * ph) for ph in phases]
+                num_qubits = int(np.log2(len(diag)))
+                q = QuantumRegister(num_qubits)
+                # test the diagonal gate for all possible basis states.
+                for i in range(2 ** (num_qubits)):
+                    qc = _prepare_basis_state(q, i)
+                    qc.diag(diag, q[0:num_qubits])
+                    vec_out = np.asarray(q_execute(qc, BasicAer.get_backend(
+                        'statevector_simulator')).result().get_statevector(qc, decimals=16))
+                    vec_desired = _apply_diag_gate_to_basis_state(phases, i)
+                    if i == 0:
+                        global_phase = vec_out[0] / vec_desired[0]
+                    vec_desired = (global_phase * vec_desired).tolist()
+                    dist = np.linalg.norm(np.array(vec_desired - vec_out))
+                    self.assertAlmostEqual(dist, 0)
 
 
 def _apply_diag_gate_to_basis_state(phases, basis_state):
