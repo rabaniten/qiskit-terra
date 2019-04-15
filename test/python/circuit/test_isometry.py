@@ -9,7 +9,7 @@
 Decomposition for uniformly controlled single-qubit unitaries test.
 """
 
-# ToDo: It might be worth to add more functionality to the class QiskitTestCase. In particular, the possibility to
+# ToDo: It might be worth to add more functionality to the class QiskitTestCase. In particular, the possibility to check
 # ToDo: a gate for a set of possible input vectors (up to a global phase shift). The testing code for UCY,UCZ, UCG and
 # ToDo: and SQU could then be simplified.
 
@@ -32,6 +32,8 @@ class TestUCG(QiskitTestCase):
     """Qiskit UCG tests."""
     @parameterized.expand(
         [[np.eye(4,4)],[unitary_group.rvs(4)[:,0:2]],[np.eye(4,4)[:,0:2]],[unitary_group.rvs(4)],
+         [np.eye(4,4)[:,np.random.permutation(np.eye(4,4).shape[1])]],
+         [np.eye(8, 8)[:, np.random.permutation(np.eye(8, 8).shape[1])]],
          [unitary_group.rvs(8)[:,0:4]],[unitary_group.rvs(8)],[unitary_group.rvs(16)],[unitary_group.rvs(16)[:,0:8]]]
     )
     def test_isometry(self, iso):
@@ -41,22 +43,18 @@ class TestUCG(QiskitTestCase):
         q = QuantumRegister(n)
         # test the isometry for all possible input basis states.
         for i in range(2**num_q_input):
-            qc = QuantumCircuit(q)
-            binary_rep = get_binary_rep_as_list(i, n)
-            for j in range(len(binary_rep)):
-                if binary_rep[j] == 1:
-                    qc.x(q[- (j+1)])
+            qc = _prepare_basis_state(q, i)
             qc.iso(iso, q[:num_q_input], q[num_q_input:])
             # ToDo: improve efficiency here by allowing to execute circuit on several states in parallel (this would
             # ToDo: in particular allow to get out the isometry the circuit is implementing by applying it to the first
-            # ToDo: few basis vectors
+            # ToDo: few basis vectors)
             vec_out = np.asarray(q_execute(qc, BasicAer.get_backend(
                 'statevector_simulator')).result().get_statevector(qc, decimals=16))
-            vec_desired = apply_isometry_to_basis_state(iso, i)
+            vec_desired = _apply_isometry_to_basis_state(iso, i)
             # It is fine if the gate is implemented up to a global phase (however, the phases between the different
             # outputs for different bases states must be correct!
             if i == 0:
-                global_phase = get_global_phase(vec_out, vec_desired)
+                global_phase = _get_global_phase(vec_out, vec_desired)
             vec_desired = (global_phase*vec_desired).tolist()
             # Remark: We should not take the fidelity to measure the overlap over the states, since the fidelity ignores
             # the global phase (and hence the phase relation between the different columns of the unitary that the gate
@@ -64,13 +62,25 @@ class TestUCG(QiskitTestCase):
             dist = np.linalg.norm(np.array(vec_desired - vec_out))
             self.assertAlmostEqual(dist, 0)
 
- # ToDo: check "up to diagonal" option
 
-def apply_isometry_to_basis_state(iso, basis_state):
+def _prepare_basis_state(q, i):
+    num_qubits=len(q)
+    qc = QuantumCircuit(q)
+    # ToDo: Remove this work around after the state vector simulator is fixed (it can't simulate the empty
+    # ToDo: circuit at the moment)
+    qc.iden(q[0])
+    binary_rep = _get_binary_rep_as_list(i, num_qubits)
+    for j in range(len(binary_rep)):
+        if binary_rep[j] == 1:
+            qc.x(q[- (j + 1)])
+    return qc
+
+
+def _apply_isometry_to_basis_state(iso, basis_state):
     return iso[:,basis_state]
 
 
-def get_binary_rep_as_list(n, num_digits):
+def _get_binary_rep_as_list(n, num_digits):
     binary_string = np.binary_repr(n).zfill(num_digits)
     binary = []
     for line in binary_string:
@@ -79,10 +89,11 @@ def get_binary_rep_as_list(n, num_digits):
     return binary
 
 
-def get_global_phase(a, b):
+def _get_global_phase(a, b):
     for i in range(len(b)):
         if abs(b[i]) > _EPS:
             return a[i]/b[i]
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -90,6 +90,7 @@ class UCRot(CompositeGate):
         # Check that the target qubis is not also listed as an control qubit
         self._check_dups(qubits, message="The target qubit cannot also be listed as a control qubit.")
 
+    # finds a decomposition of a UC rotation gate into elementary gates (C-NOTs and single-qubit rotations).
     def _dec_ucrot(self):
         """
         Call to populate the self.data list with gates that implement the uniformly controlled rotation
@@ -124,6 +125,7 @@ class UCRot(CompositeGate):
                 self._attach(CnotGate(self.q_controls[q_contr_index], self.q_target))
 
     # Calculates rotation angles for a uniformly controlled R_t gate with a C-NOT gate at the end of the circuit.
+    # The rotation angles of the gate R_t are stored in angles[start_index:end_index].
     # If reversed == True, it decomposes the gate such that there is a C-NOT gate at the start of the circuit
     # (in fact, the circuit topology for the reversed decomposition is the reversed one of the original decomposition)
     def _dec_uc_rotations(self, angles, start_index, end_index, reversedDec):

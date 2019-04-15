@@ -208,7 +208,8 @@ class UCG(CompositeGate):
         r = np.array([[r1, 0], [0, r2]], dtype=complex)
         d, u = np.linalg.eig(r.dot(x).dot(r))
         # If d is not equal to diag(i,-i), then we put it into this "standard" form
-        # (see eq. (13) in https://arxiv.org/pdf/quant-ph/0410066.pdf) by interchanging the eigenvalues and eigenvectors.
+        # (see eq. (13) in https://arxiv.org/pdf/quant-ph/0410066.pdf) by interchanging
+        # the eigenvalues and eigenvectors.
         if abs(d[0] + 1j) < _EPS:
             d = np.flip(d, 0)
             u = np.flip(u, 1)
