@@ -6,7 +6,7 @@
 # the LICENSE.txt file in the root directory of this source tree.
 
 """
-Decomposition for uniformly controlled single-qubit unitaries test.
+Tests for the decomposition of isometries from m to n qubits.
 """
 
 # ToDo: It might be worth to add more functionality to the class QiskitTestCase. In particular, the possibility to check
@@ -29,10 +29,10 @@ _EPS = 1e-10  # global variable used to chop very small numbers to zero
 
 
 class TestUCG(QiskitTestCase):
-    """Qiskit UCG tests."""
+    """Qiskit isometry tests."""
     @parameterized.expand(
         [[np.eye(4,4)],[unitary_group.rvs(4)[:,0:2]],[np.eye(4,4)[:,0:2]],[unitary_group.rvs(4)],
-         [np.eye(4,4)[:,np.random.permutation(np.eye(4,4).shape[1])]],
+         [np.eye(4,4)[:,np.random.permutation(np.eye(4,4).shape[1])][:,0:2]],
          [np.eye(8, 8)[:, np.random.permutation(np.eye(8, 8).shape[1])]],
          [unitary_group.rvs(8)[:,0:4]],[unitary_group.rvs(8)],[unitary_group.rvs(16)],[unitary_group.rvs(16)[:,0:8]]]
     )
@@ -56,9 +56,6 @@ class TestUCG(QiskitTestCase):
             if i == 0:
                 global_phase = _get_global_phase(vec_out, vec_desired)
             vec_desired = (global_phase*vec_desired).tolist()
-            # Remark: We should not take the fidelity to measure the overlap over the states, since the fidelity ignores
-            # the global phase (and hence the phase relation between the different columns of the unitary that the gate
-            # should implement)
             dist = np.linalg.norm(np.array(vec_desired - vec_out))
             self.assertAlmostEqual(dist, 0)
 

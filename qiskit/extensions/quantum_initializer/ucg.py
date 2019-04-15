@@ -236,7 +236,7 @@ def _is_isometry(m, eps):
 
 
 def ucg(self, gate_list, q_controls, q_target, up_to_diagonal=False):
-    return self._attach(UCG(gate_list, q_controls, q_target, up_to_diagonal, self))
+    return self._attach(UCG(gate_list, q_controls, q_target, up_to_diagonal))
 
 
 QuantumCircuit.ucg = ucg

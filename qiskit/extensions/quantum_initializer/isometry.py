@@ -19,6 +19,7 @@ from qiskit.circuit import QuantumCircuit
 from qiskit.exceptions import QiskitError
 from qiskit.extensions.quantum_initializer.diag import DiagGate
 from qiskit.extensions.quantum_initializer.ucg import UCG
+from qiskit.extensions.quantum_initializer._mcg_up_to_diagonal import MCGupDiag
 
 _EPS = 1e-10  # global variable used to chop very small numbers to zero
 
@@ -69,6 +70,10 @@ class Isometry(CompositeGate):
             raise QiskitError("The input qubits must be provided as a list.")
         if not type(q_ancillas_for_output) == list:
             raise QiskitError("The ancilla qubits must be provided as a list.")
+        if not type(q_ancillas_zero) == list:
+            raise QiskitError("The ancilla qubits starting in the zero state must be provided as a list.")
+        if not type(q_ancillas_dirty) == list:
+            raise QiskitError("The dirty ancilla qubits must be provided as a list.")
 
         # Check if the isometry has the right dimension and if the columns are orthonormal
         n = np.log2(isometry.shape[0])
@@ -96,7 +101,7 @@ class Isometry(CompositeGate):
         qubits = q_input + q_ancillas_for_output + q_ancillas_zero + q_ancillas_dirty
         super().__init__("init", [isometry], qubits, circ)
         # Check if a qubit is provided as an input AND as an ancilla qubit
-        self._check_dups(qubits, message="There is an input qubit that is also listed as an ancilla qubit.")
+        self._check_dups(qubits, message="There is qubit that is listed twice in the input.")
         # call to generate the circuit that takes the isometry to the first 2^m columns of the 2^n identity matrix
         self._gates_to_uncompute()
         # invert the circuit to create the circuit implementing the isometry
@@ -211,26 +216,21 @@ class Isometry(CompositeGate):
         self._attach(ucg)
         return ucg.diag
 
-    # attach a MCG up to diagonal
+    # Attach a MCG up to diagonal. The diagonal should only act on the control and target qubits
+    # and not on the ancillas. In principle, it would be allowed to act on the dirty ancillas on which we perform
+    # the isometry (i.e., on the qubits listed in "qubits" below). But for simplicity, the current code version ignores
+    # this future optimization possibility.
     def _attach_mcg_up_to_diagonal(self, gate, control_labels, target_label):
         n = int(np.log2(self.params[0].shape[0]))
         qubits = self.q_input + self.q_ancillas_for_output
-        # ToDo: Keep this threshold updated such that the lowest gate count is achieves:
-        # ToDo: we implement the MCG with a UCG up to diagonal for if the number of controls is smaller than the
-        # ToDo: threshold. Otherwise, the best method for MCGs up to a diagonal should be used
-        threshold = float("inf")
-        if n < threshold:
-            # Implement the MCG as a UCG (up to diagonal)
-            gate_list = [np.eye(2, 2) for i in range(2 ** len(control_labels))]
-            gate_list[-1] = gate
-            ucg = UCG(gate_list, _reverse_qubit_oder(_get_qubits_by_label(control_labels, qubits, n)),
-                      _get_qubits_by_label([target_label], qubits, n)[0], up_to_diagonal=True)
-            self._attach(ucg)
-            return ucg.diag
-        else:
-            # ToDo: Use the best decomposition for MCGs up to diagonal gates here (with ancillas
-            #  self.q_ancillas_zero that start in the zero state and  dirty ancillas self.q_ancillas_dirty)
-            return range(len(control_labels) + 1)
+        control_qubits = _reverse_qubit_oder(_get_qubits_by_label(control_labels, qubits, n))
+        target_qubit = _get_qubits_by_label([target_label], qubits, n)[0]
+        # The qubits on which we neither act nor control on with the MCG, can be used as dirty ancillas
+        ancilla_dirty_labels = [i for i in range(n) if i not in control_labels+[target_label]]
+        ancillas_dirty = _reverse_qubit_oder(_get_qubits_by_label(ancilla_dirty_labels, qubits, n)) + self.q_ancillas_dirty
+        mcg_up_to_diag = MCGupDiag(gate, control_qubits, target_qubit, self.q_ancillas_zero, ancillas_dirty)
+        self._attach(mcg_up_to_diag)
+        return mcg_up_to_diag.diag
 
 
 # Find special unitary matrix that maps [c0,c1] to [r,0] or [0,r] if basis_state=0 or basis_state=1 respectively
